@@ -14,7 +14,7 @@ services:
       - ./init:/usr/share/jenkins/ref/init.groovy.d:ro
       - ./samples:/var/jenkins_home/samples
     environment:
-      JAVA_OPTS: "-Xmx1g -Xms512m -Duser.timezone=${TZ:-Asia/Taipei}"
+      JAVA_OPTS: "-Xmx1g -Xms512m -Duser.timezone=${TZ:-Asia/Taipei} -Djenkins.install.runSetupWizard=false"
       DOCKER_HOST: "unix:///var/run/docker.sock"
       CASC_JENKINS_CONFIG: "/var/jenkins_home/casc.yml"
       JENKINS_ADMIN_PASSWORD: "${JENKINS_ADMIN_PASSWORD:-admin}"
