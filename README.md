@@ -21,6 +21,14 @@ cd devops-starter-kit
 cp .env.example .env
 ```
 
+Edit `.env` and set `PROJECTS_DIR` to the **absolute path** where your project repos are cloned:
+
+```env
+PROJECTS_DIR=/home/your-user/devops-projects
+```
+
+> **Why absolute?** Pipelines using `docker compose run` (ESP32, Android, HarmonyOS, .NET) create new containers with volume mounts. The Docker daemon resolves these paths on the **host**, so relative paths won't work. The directory is mounted into the Jenkins container at the same path, ensuring host and container paths match.
+
 ### 2. Start core services
 
 ```bash
@@ -150,12 +158,21 @@ DOCKER_REGISTRY=your-registry.example.com:5000
 
 ### Adding SSH Agents
 
-For iOS (Mac) or Windows pipelines, configure agents in Jenkins UI:
+For iOS (Mac) or Windows pipelines, configure SSH agents via `.env`:
 
-1. **Manage Jenkins** > **Nodes** > **New Node**
-2. Set labels: `macos` (for iOS) or `windows` (for Windows)
-3. Configure SSH credentials for the agent machine
-4. The corresponding pipeline will automatically use the labeled agent
+1. Place the SSH private key files in `jenkins/secrets/`:
+   - `jenkins/secrets/MACMINI_SSH_KEY` — for macOS/iOS agent
+   - `jenkins/secrets/WINDOWS_SSH_KEY` — for Windows agent
+2. Set the agent variables in `.env`:
+   ```env
+   MACMINI_HOST=10.0.0.10
+   MACMINI_USER=jenkins
+   MACMINI_REMOTE_FS=/Users/jenkins/agent
+   WINDOWS_HOST=10.0.0.20
+   WINDOWS_USER=jenkins
+   WINDOWS_REMOTE_FS=C:\jenkins-agent
+   ```
+3. Restart Jenkins — JCasC will auto-configure the agents with labels `macos ios` and `windows`
 
 ---
 
@@ -163,6 +180,7 @@ For iOS (Mac) or Windows pipelines, configure agents in Jenkins UI:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
+| `PROJECTS_DIR` | *(required)* | **Absolute path** to project repos directory. Mounted into Jenkins at the same path so `docker compose run` volume mounts work correctly. |
 | `JENKINS_ADMIN_PASSWORD` | `admin` | Jenkins admin password |
 | `DOCKER_GID` | `999` | Docker group ID on host (run `getent group docker \| cut -d: -f3`) |
 | `TZ` | `Asia/Taipei` | Timezone |
@@ -172,6 +190,12 @@ For iOS (Mac) or Windows pipelines, configure agents in Jenkins UI:
 | `GRAFANA_ADMIN_USER` | `admin` | Grafana admin user |
 | `GRAFANA_ADMIN_PASSWORD` | `admin` | Grafana admin password |
 | `SONARQUBE_TOKEN` | *(empty)* | SonarQube API token for exporter |
+| `MACMINI_HOST` | *(empty)* | Mac Mini SSH agent IP (optional) |
+| `MACMINI_USER` | *(empty)* | Mac Mini SSH username (optional) |
+| `MACMINI_REMOTE_FS` | `/Users/jenkins/agent` | Mac Mini agent work directory (optional) |
+| `WINDOWS_HOST` | *(empty)* | Windows SSH agent IP (optional) |
+| `WINDOWS_USER` | *(empty)* | Windows SSH username (optional) |
+| `WINDOWS_REMOTE_FS` | `C:\jenkins-agent` | Windows agent work directory (optional) |
 
 ---
 
@@ -215,7 +239,25 @@ echo "vm.max_map_count=262144" | sudo tee -a /etc/sysctl.conf
 
 ### Pipeline Paths
 
-The pre-loaded pipeline XMLs reference original project paths from the test environment. You will need to modify the `dir()` paths in each pipeline's Jenkinsfile script to point to your own project locations, or switch to SCM-based checkout.
+All pipelines use the `PROJECTS_DIR` environment variable (`${env.PROJECTS_DIR}`) to locate project repos. Make sure `.env` has the correct absolute path and your project repos are cloned under that directory. Expected structure:
+
+```
+$PROJECTS_DIR/
+├── arcana-cloud-go/
+├── arcana-cloud-rust/
+├── arcana-cloud-springboot/
+├── arcana-cloud-python/
+├── arcana-cloud-nodejs/
+├── arcana-vue/
+├── arcana-react/
+├── arcana-angular/
+├── arcana-windows/          # .NET
+├── arcana-embedded-esp32/
+├── arcana-embedded-stm32/
+├── arcana-android/
+├── arcana-harmonyos/
+└── arcana-ios/              # on Mac agent, not in this directory
+```
 
 ---
 
