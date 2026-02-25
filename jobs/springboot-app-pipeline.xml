@@ -1,0 +1,61 @@
+<?xml version="1.1" encoding="UTF-8"?><flow-definition plugin="workflow-job@1571.vb_423c255d6d9">
+  <actions>
+    <org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobAction plugin="pipeline-model-definition@2.2277.v00573e73ddf1"/>
+    <org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobPropertyTrackerAction plugin="pipeline-model-definition@2.2277.v00573e73ddf1">
+      <jobProperties/>
+      <triggers/>
+      <parameters/>
+      <options/>
+    </org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobPropertyTrackerAction>
+  </actions>
+  <description>Spring Boot Pipeline (compose)</description>
+  <keepDependencies>false</keepDependencies>
+  <properties/>
+  <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@4256.v991a_f1991c03">
+    <script>pipeline {
+    agent any
+    environment {
+        APP_NAME  = "springboot-app"
+        REGISTRY  = "localhost:5000"
+        IMAGE_TAG = "${REGISTRY}/arcana/${APP_NAME}"
+        VERSION   = "1.0.0"
+    }
+    stages {
+        stage("Checkout") {
+            steps {
+                echo "Using cloned repo: arcana-cloud-springboot"
+            }
+        }
+        stage("Docker Compose Build") {
+            steps {
+                dir("/home/jrjohn/devops-test/arcana-cloud-springboot") {
+                    sh "VERSION=${VERSION} docker compose -f docker-compose.ci.yml build"
+                    sh "docker tag localhost:5000/arcana/${APP_NAME}:${VERSION} ${IMAGE_TAG}:build-${BUILD_NUMBER}"
+                }
+            }
+        }
+        stage("Image Info") {
+            steps {
+                sh "docker images ${IMAGE_TAG}:${VERSION}"
+            }
+        }
+        stage("Push to Registry") {
+            steps {
+                sh "docker push ${IMAGE_TAG}:${VERSION}"
+                sh "docker push ${IMAGE_TAG}:build-${BUILD_NUMBER}"
+            }
+        }
+    }
+    post {
+        success { echo "Pipeline SUCCESS - ${APP_NAME}:${VERSION}" }
+        failure { echo "Pipeline FAILED" }
+        always  { echo "Build number ${BUILD_NUMBER} done" }
+    }
+}
+
+</script>
+    <sandbox>true</sandbox>
+  </definition>
+  <triggers/>
+  <disabled>false</disabled>
+</flow-definition>

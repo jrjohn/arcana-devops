@@ -1,0 +1,64 @@
+<?xml version="1.1" encoding="UTF-8"?><flow-definition plugin="workflow-job">
+  <description>.NET Cross-Platform Pipeline (arcana-windows core libraries + tests, excludes WinUI 3)</description>
+  <keepDependencies>false</keepDependencies>
+  <properties/>
+  <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps">
+    <script>
+pipeline {
+    agent any
+    environment {
+        APP_NAME  = 'dotnet-app'
+        REGISTRY  = 'arcana.boo/arcana'
+        IMAGE_TAG = "${REGISTRY}/${APP_NAME}"
+        VERSION   = '0.2.0'
+    }
+    options {
+        timeout(time: 15, unit: 'MINUTES')
+        disableConcurrentBuilds()
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+    }
+    stages {
+        stage('Checkout') {
+            steps {
+                echo "Building arcana-windows (cross-platform .NET) v${VERSION}"
+            }
+        }
+        stage('Docker Build') {
+            steps {
+                dir('/home/jrjohn/devops-test/arcana-windows') {
+                    sh "VERSION=${VERSION} docker compose build"
+                    sh "docker tag ${IMAGE_TAG}:${VERSION} ${IMAGE_TAG}:build-${BUILD_NUMBER}"
+                }
+            }
+        }
+        stage('Unit Tests') {
+            steps {
+                dir('/home/jrjohn/devops-test/arcana-windows') {
+                    sh "docker compose run --rm dotnet-build dotnet test -c Release --no-build --logger \"trx;LogFileName=results.trx\" --results-directory /app/test-results || true"
+                }
+            }
+        }
+        stage('Image Info') {
+            steps {
+                sh "docker images ${IMAGE_TAG}:${VERSION}"
+            }
+        }
+        stage('Push to Registry') {
+            steps {
+                sh "docker push ${IMAGE_TAG}:${VERSION}"
+                sh "docker push ${IMAGE_TAG}:build-${BUILD_NUMBER}"
+            }
+        }
+    }
+    post {
+        success { echo "Pipeline SUCCESS - arcana-windows .NET ${APP_NAME}:${VERSION}" }
+        failure { echo "Pipeline FAILED" }
+        always  { echo "Build number ${BUILD_NUMBER} done" }
+    }
+}
+</script>
+    <sandbox>true</sandbox>
+  </definition>
+  <triggers/>
+  <disabled>false</disabled>
+</flow-definition>

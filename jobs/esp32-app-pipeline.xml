@@ -1,0 +1,58 @@
+<?xml version="1.1" encoding="UTF-8"?><flow-definition plugin="workflow-job@1571.vb_423c255d6d9">
+  <actions>
+    <org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobAction plugin="pipeline-model-definition@2.2277.v00573e73ddf1"/>
+    <org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobPropertyTrackerAction plugin="pipeline-model-definition@2.2277.v00573e73ddf1">
+      <jobProperties/>
+      <triggers/>
+      <parameters/>
+      <options/>
+    </org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobPropertyTrackerAction>
+  </actions>
+  <description>ESP32 Firmware Pipeline (docker pull + compose)</description>
+  <keepDependencies>false</keepDependencies>
+  <properties/>
+  <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@4256.v991a_f1991c03">
+    <script>pipeline {
+    agent any
+    environment {
+        APP_NAME    = "esp32-app"
+        VERSION     = "1.0.0"
+        PROJECT_DIR = "/home/jrjohn/devops-test/arcana-embedded-esp32"
+    }
+    stages {
+        stage("Checkout") {
+            steps { echo "Using cloned repo: arcana-embedded-esp32" }
+        }
+        stage("Pull Build Image") {
+            steps { sh "docker pull espressif/idf:v5.5.2" }
+        }
+        stage("Build Firmware") {
+            steps {
+                dir("${PROJECT_DIR}") {
+                    sh "docker compose -f docker-compose.ci.yml run --rm esp32-build"
+                }
+            }
+        }
+        stage("Extract Artifacts") {
+            steps {
+                sh "rm -rf /tmp/esp32-app-firmware &amp;&amp; mkdir -p /tmp/esp32-app-firmware"
+                sh "cp ${PROJECT_DIR}/build/mqtt5.bin /tmp/esp32-app-firmware/ || echo no-bin"
+                sh "cp ${PROJECT_DIR}/build/bootloader/bootloader.bin /tmp/esp32-app-firmware/ || echo no-bootloader"
+                sh "cp ${PROJECT_DIR}/build/partition_table/partition-table.bin /tmp/esp32-app-firmware/ || echo no-partition"
+                sh "ls -la /tmp/esp32-app-firmware/"
+            }
+        }
+    }
+    post {
+        success { echo "Pipeline SUCCESS - esp32 firmware built" }
+        failure { echo "Pipeline FAILED" }
+        always  { echo "Build done" }
+    }
+}
+
+</script>
+    <sandbox>true</sandbox>
+  </definition>
+  <triggers/>
+  <disabled>false</disabled>
+</flow-definition>

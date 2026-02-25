@@ -1,0 +1,6 @@
+services:
+  go-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ${DOCKER_REGISTRY:-localhost:5000}/arcana/go-app:${VERSION:-1.0.0}

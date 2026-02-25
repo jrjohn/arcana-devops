@@ -1,0 +1,23 @@
+# Environment
+.env
+
+# Jenkins data
+jenkins_home/
+
+# Logs
+*.log
+
+# Claude
+.claude/
+
+# Node
+node_modules/
+
+# Monitoring data
+grafana_data/
+prometheus_data/
+loki_data/
+
+# OS
+.DS_Store
+Thumbs.db

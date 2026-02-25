@@ -1,0 +1,112 @@
+<?xml version='1.1' encoding='UTF-8'?>
+<flow-definition plugin="workflow-job@1571.vb_423c255d6d9">
+  <actions>
+    <org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobAction plugin="pipeline-model-definition@2.2277.v00573e73ddf1"/>
+    <org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobPropertyTrackerAction plugin="pipeline-model-definition@2.2277.v00573e73ddf1">
+      <jobProperties>
+        <string>org.jenkinsci.plugins.workflow.job.properties.DisableConcurrentBuildsJobProperty</string>
+        <string>jenkins.model.BuildDiscarderProperty</string>
+      </jobProperties>
+      <triggers/>
+      <parameters/>
+      <options/>
+    </org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobPropertyTrackerAction>
+  </actions>
+  <description>Windows WinUI 3 Pipeline (Arcana.App — EXE + MSIX dual output) - Requires Windows Agent</description>
+  <keepDependencies>false</keepDependencies>
+  <properties>
+    <jenkins.model.BuildDiscarderProperty>
+      <strategy class="hudson.tasks.LogRotator">
+        <daysToKeep>-1</daysToKeep>
+        <numToKeep>10</numToKeep>
+        <artifactDaysToKeep>-1</artifactDaysToKeep>
+        <artifactNumToKeep>-1</artifactNumToKeep>
+        <removeLastBuild>false</removeLastBuild>
+      </strategy>
+    </jenkins.model.BuildDiscarderProperty>
+    <org.jenkinsci.plugins.workflow.job.properties.DisableConcurrentBuildsJobProperty>
+      <abortPrevious>false</abortPrevious>
+    </org.jenkinsci.plugins.workflow.job.properties.DisableConcurrentBuildsJobProperty>
+  </properties>
+  <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@4256.v991a_f1991c03">
+    <script>pipeline {
+    agent { label &apos;windows&apos; }
+    environment {
+        APP_NAME    = &apos;arcana-windows&apos;
+        VERSION     = &apos;0.1.0&apos;
+        PROJECT_DIR = &apos;C:\\Users\\johnc\\devops-test\\arcana-windows&apos;
+    }
+    options {
+        timeout(time: 30, unit: &apos;MINUTES&apos;)
+        disableConcurrentBuilds()
+        buildDiscarder(logRotator(numToKeepStr: &apos;10&apos;))
+    }
+    stages {
+        stage(&apos;Checkout&apos;) {
+            steps {
+                dir(&quot;${PROJECT_DIR}&quot;) {
+                    bat &apos;git pull origin main || echo &quot;Pull skipped&quot;&apos;
+                }
+                echo &quot;Building ${APP_NAME} WinUI 3 v${VERSION}&quot;
+            }
+        }
+        stage(&apos;Restore&apos;) {
+            steps {
+                dir(&quot;${PROJECT_DIR}&quot;) {
+                    bat &quot;dotnet restore Arcana.Windows.sln&quot;
+                }
+            }
+        }
+        stage(&apos;Build&apos;) {
+            steps {
+                dir(&quot;${PROJECT_DIR}&quot;) {
+                    bat &quot;dotnet build src\\Arcana.App\\Arcana.App.csproj -c Release -p:Platform=x64 -maxcpucount:1&quot;
+                }
+            }
+        }
+        stage(&apos;Unit Tests&apos;) {
+            steps {
+                dir(&quot;${PROJECT_DIR}&quot;) {
+                    bat &quot;if exist TestResults rmdir /s /q TestResults&quot;
+                    bat &quot;dotnet test -c Release -p:Platform=x64 --logger trx --results-directory TestResults || exit 0&quot;
+                }
+            }
+            post {
+                always {
+                    dir(&quot;${PROJECT_DIR}&quot;) {
+                        junit allowEmptyResults: true, testResults: &apos;TestResults/**/*.trx&apos;
+                    }
+                }
+            }
+        }
+        stage(&apos;Publish EXE&apos;) {
+            steps {
+                dir(&quot;${PROJECT_DIR}&quot;) {
+                    bat &quot;if exist artifacts\\exe rmdir /s /q artifacts\\exe&quot;
+                    bat &quot;dotnet publish src\\Arcana.App\\Arcana.App.csproj -c Release -p:Platform=x64 -p:WindowsPackageType=None --self-contained -r win-x64 -o artifacts\\exe -maxcpucount:1&quot;
+                    archiveArtifacts artifacts: &apos;artifacts/exe/Arcana.App.exe&apos;, fingerprint: true
+                }
+            }
+        }
+        stage(&apos;MSIX Package&apos;) {
+            steps {
+                dir(&quot;${PROJECT_DIR}&quot;) {
+                    bat &quot;if exist artifacts\\msix rmdir /s /q artifacts\\msix&quot;
+                    bat &quot;dotnet publish src\\Arcana.App\\Arcana.App.csproj -c Release -p:Platform=x64 -p:WindowsPackageType=MSIX -p:AppxPackageSigningEnabled=false -p:GenerateAppxPackageOnBuild=true -maxcpucount:1&quot;
+                    bat &quot;mkdir artifacts\\msix 2&gt;NUL &amp; copy /Y src\\Arcana.App\\obj\\x64\\Release\\net10.0-windows10.0.19041.0\\win-x64\\MsixContent\\MSIX\\*.msix artifacts\\msix\\ 2&gt;NUL &amp; echo MSIX collected&quot;
+                    archiveArtifacts artifacts: &apos;artifacts/msix/*.msix&apos;, fingerprint: true, allowEmptyArchive: true
+                }
+            }
+        }
+    }
+    post {
+        success { echo &quot;Windows build SUCCESS - ${APP_NAME} v${VERSION} (EXE + MSIX)&quot; }
+        failure { echo &quot;Windows build FAILED - ${APP_NAME}&quot; }
+        always  { echo &quot;Build number ${BUILD_NUMBER} done&quot; }
+    }
+}</script>
+    <sandbox>true</sandbox>
+  </definition>
+  <triggers/>
+  <disabled>false</disabled>
+</flow-definition>

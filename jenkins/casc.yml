@@ -1,0 +1,22 @@
+jenkins:
+  systemMessage: "Jenkins DevOps Starter Kit — Managed by JCasC"
+  numExecutors: 4
+  mode: NORMAL
+  securityRealm:
+    local:
+      allowsSignup: false
+      users:
+        - id: "admin"
+          password: "${JENKINS_ADMIN_PASSWORD:-admin}"
+  authorizationStrategy:
+    loggedInUsersCanDoAnything:
+      allowAnonymousRead: false
+  globalNodeProperties:
+    - envVars:
+        env:
+          - key: "DOCKER_REGISTRY"
+            value: "${DOCKER_REGISTRY:-localhost:5000}"
+
+unclassified:
+  location:
+    url: "${JENKINS_URL:-http://localhost:8080/}"
