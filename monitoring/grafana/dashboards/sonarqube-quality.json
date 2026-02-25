@@ -620,8 +620,8 @@
     },
     {
       "id": 8,
-      "title": "Lines of Code by Language",
-      "description": "Distribution of lines of code grouped by programming language",
+      "title": "Lines of Code by Project",
+      "description": "Distribution of lines of code grouped by project",
       "type": "piechart",
       "datasource": {
         "type": "prometheus",
@@ -683,8 +683,8 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (language) (sonarqube_ncloc)",
-          "legendFormat": "{{language}}",
+          "expr": "sonarqube_ncloc",
+          "legendFormat": "{{project}}",
           "refId": "A",
           "editorMode": "code",
           "range": true,
@@ -843,7 +843,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sonarqube_quality_gate_status",
+          "expr": "sonarqube_alert_status",
           "legendFormat": "",
           "refId": "A",
           "editorMode": "code",

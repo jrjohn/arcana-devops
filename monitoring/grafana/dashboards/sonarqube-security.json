@@ -684,8 +684,8 @@
     },
     {
       "id": 8,
-      "title": "Hotspot Review Status",
-      "description": "Distribution of security hotspots by review status",
+      "title": "Security Hotspots by Project",
+      "description": "Distribution of security hotspots by project",
       "type": "piechart",
       "datasource": {
         "type": "prometheus",
@@ -712,38 +712,7 @@
           "mappings": [],
           "unit": "short"
         },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Reviewed"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "green",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "To Review"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "orange",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          }
-        ]
+        "overrides": []
       },
       "options": {
         "reduceOptions": {
@@ -778,21 +747,9 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(sonarqube_security_hotspots_reviewed)",
-          "legendFormat": "Reviewed",
+          "expr": "sonarqube_security_hotspots",
+          "legendFormat": "{{project}}",
           "refId": "A",
-          "editorMode": "code",
-          "range": false,
-          "instant": true
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(sonarqube_security_hotspots) - sum(sonarqube_security_hotspots_reviewed)",
-          "legendFormat": "To Review",
-          "refId": "B",
           "editorMode": "code",
           "range": false,
           "instant": true

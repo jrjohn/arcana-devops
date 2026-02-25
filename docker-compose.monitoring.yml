@@ -60,11 +60,13 @@ services:
     restart: unless-stopped
 
   sonarqube-exporter:
-    image: return200/sonarqube-exporter:latest
+    build: ./monitoring/sonarqube-exporter
     container_name: sonarqube-exporter
     environment:
       SONARQUBE_URL: "http://sonarqube:9000"
       SONARQUBE_TOKEN: "${SONARQUBE_TOKEN:-}"
+      POLL_INTERVAL: "60"
+      METRICS_PORT: "9101"
     ports:
       - "9101:9101"
     restart: unless-stopped
