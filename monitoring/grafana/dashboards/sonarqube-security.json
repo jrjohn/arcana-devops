@@ -28,7 +28,7 @@
       "type": "stat",
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "gridPos": {
         "h": 4,
@@ -44,10 +44,22 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 1 },
-              { "color": "orange", "value": 5 },
-              { "color": "red", "value": 20 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "orange",
+                "value": 5
+              },
+              {
+                "color": "red",
+                "value": 20
+              }
             ]
           },
           "mappings": [],
@@ -58,7 +70,9 @@
       "options": {
         "reduceOptions": {
           "values": false,
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": ""
         },
         "orientation": "auto",
@@ -72,7 +86,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "expr": "sum(sonarqube_vulnerabilities)",
           "legendFormat": "Vulnerabilities",
@@ -90,7 +104,7 @@
       "type": "stat",
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "gridPos": {
         "h": 4,
@@ -106,10 +120,22 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 5 },
-              { "color": "orange", "value": 20 },
-              { "color": "red", "value": 50 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 5
+              },
+              {
+                "color": "orange",
+                "value": 20
+              },
+              {
+                "color": "red",
+                "value": 50
+              }
             ]
           },
           "mappings": [],
@@ -120,7 +146,9 @@
       "options": {
         "reduceOptions": {
           "values": false,
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": ""
         },
         "orientation": "auto",
@@ -134,7 +162,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "expr": "sum(sonarqube_security_hotspots)",
           "legendFormat": "Hotspots",
@@ -152,7 +180,7 @@
       "type": "stat",
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "gridPos": {
         "h": 4,
@@ -168,21 +196,56 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "light-green", "value": 2 },
-              { "color": "yellow", "value": 3 },
-              { "color": "orange", "value": 4 },
-              { "color": "red", "value": 5 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "light-green",
+                "value": 2
+              },
+              {
+                "color": "yellow",
+                "value": 3
+              },
+              {
+                "color": "orange",
+                "value": 4
+              },
+              {
+                "color": "red",
+                "value": 5
+              }
             ]
           },
           "mappings": [
             {
               "options": {
-                "1": { "text": "A", "color": "green", "index": 0 },
-                "2": { "text": "B", "color": "light-green", "index": 1 },
-                "3": { "text": "C", "color": "yellow", "index": 2 },
-                "4": { "text": "D", "color": "orange", "index": 3 },
-                "5": { "text": "E", "color": "red", "index": 4 }
+                "1": {
+                  "text": "A",
+                  "color": "green",
+                  "index": 0
+                },
+                "2": {
+                  "text": "B",
+                  "color": "light-green",
+                  "index": 1
+                },
+                "3": {
+                  "text": "C",
+                  "color": "yellow",
+                  "index": 2
+                },
+                "4": {
+                  "text": "D",
+                  "color": "orange",
+                  "index": 3
+                },
+                "5": {
+                  "text": "E",
+                  "color": "red",
+                  "index": 4
+                }
               },
               "type": "value"
             }
@@ -194,7 +257,9 @@
       "options": {
         "reduceOptions": {
           "values": false,
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": ""
         },
         "orientation": "auto",
@@ -208,7 +273,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "expr": "max(sonarqube_security_rating)",
           "legendFormat": "Security Rating",
@@ -226,7 +291,7 @@
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "gridPos": {
         "h": 8,
@@ -274,8 +339,14 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
             ]
           },
           "mappings": [],
@@ -299,7 +370,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "expr": "sonarqube_vulnerabilities",
           "legendFormat": "{{project}}",
@@ -317,7 +388,7 @@
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "gridPos": {
         "h": 8,
@@ -365,8 +436,14 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
             ]
           },
           "mappings": [],
@@ -390,7 +467,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "expr": "sonarqube_security_hotspots",
           "legendFormat": "{{project}}",
@@ -408,7 +485,7 @@
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "gridPos": {
         "h": 8,
@@ -456,18 +533,39 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
             ]
           },
           "mappings": [
             {
               "options": {
-                "1": { "text": "A", "index": 0 },
-                "2": { "text": "B", "index": 1 },
-                "3": { "text": "C", "index": 2 },
-                "4": { "text": "D", "index": 3 },
-                "5": { "text": "E", "index": 4 }
+                "1": {
+                  "text": "A",
+                  "index": 0
+                },
+                "2": {
+                  "text": "B",
+                  "index": 1
+                },
+                "3": {
+                  "text": "C",
+                  "index": 2
+                },
+                "4": {
+                  "text": "D",
+                  "index": 3
+                },
+                "5": {
+                  "text": "E",
+                  "index": 4
+                }
               },
               "type": "value"
             }
@@ -495,7 +593,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "expr": "sonarqube_security_rating",
           "legendFormat": "{{project}}",
@@ -513,7 +611,7 @@
       "type": "bargauge",
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "gridPos": {
         "h": 8,
@@ -529,10 +627,22 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 1 },
-              { "color": "orange", "value": 5 },
-              { "color": "red", "value": 20 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "orange",
+                "value": 5
+              },
+              {
+                "color": "red",
+                "value": 20
+              }
             ]
           },
           "mappings": [],
@@ -543,7 +653,9 @@
       "options": {
         "reduceOptions": {
           "values": false,
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": ""
         },
         "orientation": "horizontal",
@@ -559,7 +671,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "expr": "sonarqube_vulnerabilities",
           "legendFormat": "{{project}}",
@@ -577,7 +689,7 @@
       "type": "piechart",
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "gridPos": {
         "h": 8,
@@ -636,7 +748,9 @@
       "options": {
         "reduceOptions": {
           "values": false,
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": ""
         },
         "pieType": "donut",
@@ -648,15 +762,21 @@
           "displayMode": "table",
           "placement": "right",
           "showLegend": true,
-          "values": ["value", "percent"]
+          "values": [
+            "value",
+            "percent"
+          ]
         },
-        "displayLabels": ["name", "percent"]
+        "displayLabels": [
+          "name",
+          "percent"
+        ]
       },
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "expr": "sum(sonarqube_security_hotspots_reviewed)",
           "legendFormat": "Reviewed",
@@ -668,7 +788,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "expr": "sum(sonarqube_security_hotspots) - sum(sonarqube_security_hotspots_reviewed)",
           "legendFormat": "To Review",
@@ -686,7 +806,7 @@
       "type": "table",
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "gridPos": {
         "h": 8,
@@ -702,8 +822,14 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
             ]
           },
           "custom": {
@@ -745,10 +871,22 @@
                 "value": {
                   "mode": "absolute",
                   "steps": [
-                    { "color": "green", "value": null },
-                    { "color": "yellow", "value": 1 },
-                    { "color": "orange", "value": 5 },
-                    { "color": "red", "value": 20 }
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 1
+                    },
+                    {
+                      "color": "orange",
+                      "value": 5
+                    },
+                    {
+                      "color": "red",
+                      "value": 20
+                    }
                   ]
                 }
               },
@@ -777,10 +915,22 @@
                 "value": {
                   "mode": "absolute",
                   "steps": [
-                    { "color": "green", "value": null },
-                    { "color": "yellow", "value": 5 },
-                    { "color": "orange", "value": 20 },
-                    { "color": "red", "value": 50 }
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 5
+                    },
+                    {
+                      "color": "orange",
+                      "value": 20
+                    },
+                    {
+                      "color": "red",
+                      "value": 50
+                    }
                   ]
                 }
               },
@@ -803,11 +953,31 @@
                 "value": [
                   {
                     "options": {
-                      "1": { "text": "A", "color": "green", "index": 0 },
-                      "2": { "text": "B", "color": "light-green", "index": 1 },
-                      "3": { "text": "C", "color": "yellow", "index": 2 },
-                      "4": { "text": "D", "color": "orange", "index": 3 },
-                      "5": { "text": "E", "color": "red", "index": 4 }
+                      "1": {
+                        "text": "A",
+                        "color": "green",
+                        "index": 0
+                      },
+                      "2": {
+                        "text": "B",
+                        "color": "light-green",
+                        "index": 1
+                      },
+                      "3": {
+                        "text": "C",
+                        "color": "yellow",
+                        "index": 2
+                      },
+                      "4": {
+                        "text": "D",
+                        "color": "orange",
+                        "index": 3
+                      },
+                      "5": {
+                        "text": "E",
+                        "color": "red",
+                        "index": 4
+                      }
                     },
                     "type": "value"
                   }
@@ -828,7 +998,9 @@
         "cellHeight": "sm",
         "footer": {
           "show": false,
-          "reducer": ["sum"],
+          "reducer": [
+            "sum"
+          ],
           "countRows": false,
           "fields": ""
         },
@@ -866,7 +1038,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "expr": "sonarqube_vulnerabilities",
           "legendFormat": "",
@@ -879,7 +1051,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "expr": "sonarqube_security_hotspots",
           "legendFormat": "",
@@ -892,7 +1064,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "expr": "sonarqube_security_rating",
           "legendFormat": "",
@@ -906,29 +1078,12 @@
     }
   ],
   "schemaVersion": 39,
-  "tags": ["sonarqube", "security"],
+  "tags": [
+    "sonarqube",
+    "security"
+  ],
   "templating": {
-    "list": [
-      {
-        "current": {
-          "selected": false,
-          "text": "Prometheus",
-          "value": "prometheus"
-        },
-        "hide": 0,
-        "includeAll": false,
-        "label": "Datasource",
-        "multi": false,
-        "name": "DS_PROMETHEUS",
-        "options": [],
-        "query": "prometheus",
-        "queryValue": "",
-        "refresh": 1,
-        "regex": "",
-        "skipUrlSync": false,
-        "type": "datasource"
-      }
-    ]
+    "list": []
   },
   "time": {
     "from": "now-7d",

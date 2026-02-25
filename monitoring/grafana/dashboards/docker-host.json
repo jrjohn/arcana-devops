@@ -42,9 +42,18 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "orange", "value": 50 },
-              { "color": "red", "value": 80 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 50
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
             ]
           },
           "mappings": [],
@@ -59,7 +68,9 @@
       "options": {
         "reduceOptions": {
           "values": false,
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": ""
         },
         "orientation": "auto",
@@ -103,9 +114,18 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "orange", "value": 60 },
-              { "color": "red", "value": 80 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 60
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
             ]
           },
           "mappings": [],
@@ -120,7 +140,9 @@
       "options": {
         "reduceOptions": {
           "values": false,
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": ""
         },
         "showThresholdLabels": false,
@@ -162,9 +184,18 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "orange", "value": 60 },
-              { "color": "red", "value": 80 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 60
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
             ]
           },
           "mappings": [],
@@ -179,7 +210,9 @@
       "options": {
         "reduceOptions": {
           "values": false,
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": ""
         },
         "showThresholdLabels": false,
@@ -221,7 +254,10 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null }
+              {
+                "color": "green",
+                "value": null
+              }
             ]
           },
           "mappings": [],
@@ -234,7 +270,9 @@
       "options": {
         "reduceOptions": {
           "values": false,
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": ""
         },
         "orientation": "auto",
@@ -304,8 +342,14 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
             ]
           },
           "mappings": [],
@@ -325,7 +369,10 @@
         "legend": {
           "displayMode": "list",
           "placement": "bottom",
-          "calcs": ["mean", "lastNotNull"]
+          "calcs": [
+            "mean",
+            "lastNotNull"
+          ]
         }
       },
       "targets": [
@@ -414,7 +461,10 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null }
+              {
+                "color": "green",
+                "value": null
+              }
             ]
           },
           "mappings": [],
@@ -433,7 +483,10 @@
         "legend": {
           "displayMode": "list",
           "placement": "bottom",
-          "calcs": ["mean", "lastNotNull"]
+          "calcs": [
+            "mean",
+            "lastNotNull"
+          ]
         }
       },
       "targets": [
@@ -531,7 +584,10 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null }
+              {
+                "color": "green",
+                "value": null
+              }
             ]
           },
           "mappings": [],
@@ -563,7 +619,10 @@
         "legend": {
           "displayMode": "list",
           "placement": "bottom",
-          "calcs": ["mean", "lastNotNull"]
+          "calcs": [
+            "mean",
+            "lastNotNull"
+          ]
         }
       },
       "targets": [
@@ -634,7 +693,10 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null }
+              {
+                "color": "green",
+                "value": null
+              }
             ]
           },
           "mappings": [],
@@ -666,7 +728,10 @@
         "legend": {
           "displayMode": "list",
           "placement": "bottom",
-          "calcs": ["mean", "lastNotNull"]
+          "calcs": [
+            "mean",
+            "lastNotNull"
+          ]
         }
       },
       "targets": [
@@ -711,9 +776,18 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "orange", "value": 60 },
-              { "color": "red", "value": 80 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 60
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
             ]
           },
           "mappings": [],
@@ -728,7 +802,9 @@
       "options": {
         "reduceOptions": {
           "values": false,
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": ""
         },
         "orientation": "horizontal",
@@ -800,7 +876,10 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null }
+              {
+                "color": "green",
+                "value": null
+              }
             ]
           },
           "mappings": [],
@@ -819,7 +898,10 @@
         "legend": {
           "displayMode": "list",
           "placement": "bottom",
-          "calcs": ["mean", "lastNotNull"]
+          "calcs": [
+            "mean",
+            "lastNotNull"
+          ]
         }
       },
       "targets": [
@@ -855,7 +937,11 @@
   ],
   "refresh": "30s",
   "schemaVersion": 39,
-  "tags": ["node-exporter", "docker", "linux"],
+  "tags": [
+    "node-exporter",
+    "docker",
+    "linux"
+  ],
   "templating": {
     "list": []
   },
