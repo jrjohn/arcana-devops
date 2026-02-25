@@ -68,7 +68,18 @@ credentials:
               privateKeySource:
                 directEntry:
                   privateKey: "${WINDOWS_SSH_KEY}"
+          - string:
+              scope: GLOBAL
+              id: "sonarqube-token"
+              description: "SonarQube Authentication Token"
+              secret: "${SONARQUBE_TOKEN}"
 
 unclassified:
   location:
     url: "${JENKINS_URL:-http://localhost:8080/}"
+  sonarGlobalConfiguration:
+    buildWrapperEnabled: true
+    installations:
+      - name: "SonarQube"
+        serverUrl: "${SONAR_HOST_URL:-http://sonarqube:9000}"
+        credentialsId: "sonarqube-token"

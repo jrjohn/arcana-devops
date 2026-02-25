@@ -34,9 +34,27 @@
                 }
             }
         }
+        stage("SonarQube Analysis") {
+            steps {
+                dir("${env.PROJECTS_DIR}/arcana-cloud-python") {
+                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                        withSonarQubeEnv('SonarQube') {
+                            sh '''sonar-scanner \
+                              -Dsonar.projectKey=python-app \
+                              -Dsonar.projectName="Python App" \
+                              -Dsonar.sources=. \
+                              -Dsonar.exclusions=venv/**,**/__pycache__/** \
+                              -Dsonar.python.version=3.12 \
+                              -Dsonar.scm.disabled=true \
+                              -Dsonar.coverage.jacoco.xmlReportPaths='''
+                        }
+                    }
+                }
+            }
+        }
         stage("Image Info") {
             steps {
-                sh "docker images ${IMAGE_TAG}:${VERSION}"
+                sh "docker images --format 'table {{.Repository}}:{{.Tag}}\t{{.Size}}' ${IMAGE_TAG}:${VERSION}"
             }
         }
         stage("Push to Registry") {

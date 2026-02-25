@@ -12,7 +12,7 @@
       <options/>
     </org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobPropertyTrackerAction>
   </actions>
-  <description>Windows WinUI 3 Pipeline (Arcana.App — EXE + MSIX dual output) - Requires Windows Agent</description>
+  <description>Windows WinUI 3 Pipeline (Arcana.App -- EXE + MSIX dual output) - Requires Windows Agent</description>
   <keepDependencies>false</keepDependencies>
   <properties>
     <jenkins.model.BuildDiscarderProperty>
@@ -77,6 +77,11 @@
                         junit allowEmptyResults: true, testResults: &apos;TestResults/**/*.trx&apos;
                     }
                 }
+            }
+        }
+        stage(&apos;SonarQube Analysis&apos;) {
+            steps {
+                echo &quot;Windows remote agent requires dotnet-sonarscanner + Java -- skipping (see advanced setup)&quot;
             }
         }
         stage(&apos;Publish EXE&apos;) {

@@ -34,9 +34,28 @@
                 }
             }
         }
+        stage("SonarQube Analysis") {
+            steps {
+                dir("${env.PROJECTS_DIR}/arcana-cloud-springboot") {
+                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                        withSonarQubeEnv('SonarQube') {
+                            sh '''sonar-scanner \
+                              -Dsonar.projectKey=springboot-app \
+                              -Dsonar.projectName="Spring Boot App" \
+                              -Dsonar.sources=. \
+                              -Dsonar.exclusions=**/build/**,**/target/**,**/.gradle/**,**/docs/**,**/*.java \
+                              -Dsonar.java.binaries=. \
+                              -Dsonar.python.version=3.12 \
+                              -Dsonar.scm.disabled=true \
+                              -Dsonar.coverage.jacoco.xmlReportPaths='''
+                        }
+                    }
+                }
+            }
+        }
         stage("Image Info") {
             steps {
-                sh "docker images ${IMAGE_TAG}:${VERSION}"
+                sh "docker images --format 'table {{.Repository}}:{{.Tag}}\t{{.Size}}' ${IMAGE_TAG}:${VERSION}"
             }
         }
         stage("Push to Registry") {

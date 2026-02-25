@@ -58,8 +58,13 @@
         stage("Test") {
             steps {
                 dir("/Users/jenkins/devops-test/arcana-ios") {
-                    sh "xcodebuild -project arcana-ios.xcodeproj -scheme arcana-ios -destination 'platform=iOS Simulator,name=iPhone 16' test 2&gt;&amp;1 | tail -30"
+                    sh "xcodebuild -project arcana-ios.xcodeproj -scheme arcana-ios -destination 'platform=iOS Simulator,name=iPhone 17' test 2&gt;&amp;1 | tail -30"
                 }
+            }
+        }
+        stage("SonarQube Analysis") {
+            steps {
+                echo "Swift requires SonarQube Developer Edition -- skipping analysis"
             }
         }
     }

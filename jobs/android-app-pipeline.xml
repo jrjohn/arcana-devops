@@ -56,6 +56,24 @@
                 }
             }
         }
+        stage("SonarQube Analysis") {
+            steps {
+                dir("${PROJECT_DIR}") {
+                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                        withSonarQubeEnv('SonarQube') {
+                            sh '''sonar-scanner \
+                              -Dsonar.projectKey=android-app \
+                              -Dsonar.projectName="Android App" \
+                              -Dsonar.sources=. \
+                              -Dsonar.exclusions=**/build/**,**/.gradle/**,**/docs/**,**/*.java,**/*.kt \
+                              -Dsonar.java.binaries=. \
+                              -Dsonar.scm.disabled=true \
+                              -Dsonar.coverage.jacoco.xmlReportPaths='''
+                        }
+                    }
+                }
+            }
+        }
         stage("Verify APK") {
             steps {
                 dir("${PROJECT_DIR}") {

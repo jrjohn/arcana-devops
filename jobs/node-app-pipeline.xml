@@ -34,9 +34,26 @@
                 }
             }
         }
+        stage("SonarQube Analysis") {
+            steps {
+                dir("${env.PROJECTS_DIR}/arcana-cloud-nodejs") {
+                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                        withSonarQubeEnv('SonarQube') {
+                            sh '''sonar-scanner \
+                              -Dsonar.projectKey=node-app \
+                              -Dsonar.projectName="Node App" \
+                              -Dsonar.sources=. \
+                              -Dsonar.exclusions=node_modules/**,dist/** \
+                              -Dsonar.scm.disabled=true \
+                              -Dsonar.coverage.jacoco.xmlReportPaths='''
+                        }
+                    }
+                }
+            }
+        }
         stage("Image Info") {
             steps {
-                sh "docker images ${IMAGE_TAG}:${VERSION}"
+                sh "docker images --format 'table {{.Repository}}:{{.Tag}}\t{{.Size}}' ${IMAGE_TAG}:${VERSION}"
             }
         }
         stage("Push to Registry") {

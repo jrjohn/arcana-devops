@@ -35,6 +35,23 @@
                 }
             }
         }
+        stage("SonarQube Analysis") {
+            steps {
+                dir("${env.PROJECTS_DIR}/arcana-harmonyos") {
+                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                        withSonarQubeEnv('SonarQube') {
+                            sh '''sonar-scanner \
+                              -Dsonar.projectKey=harmonyos-app \
+                              -Dsonar.projectName="HarmonyOS App" \
+                              -Dsonar.sources=entry/src/main \
+                              -Dsonar.exclusions=node_modules/**,oh_modules/** \
+                              -Dsonar.scm.disabled=true \
+                              -Dsonar.coverage.jacoco.xmlReportPaths='''
+                        }
+                    }
+                }
+            }
+        }
         stage("Verify HAP") {
             steps {
                 dir("${env.PROJECTS_DIR}/arcana-harmonyos") {

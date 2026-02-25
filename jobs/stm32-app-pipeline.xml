@@ -29,6 +29,11 @@
                 }
             }
         }
+        stage("SonarQube Analysis") {
+            steps {
+                echo "C requires SonarQube Developer Edition -- skipping analysis"
+            }
+        }
         stage("Extract Artifacts") {
             steps {
                 sh "docker create --name ${APP_NAME}-out stm32-app-build:${VERSION} 2&gt;/dev/null || true"

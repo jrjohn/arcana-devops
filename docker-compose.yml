@@ -29,6 +29,8 @@ services:
       WINDOWS_HOST: "${WINDOWS_HOST:-}"
       WINDOWS_USER: "${WINDOWS_USER:-}"
       WINDOWS_REMOTE_FS: "${WINDOWS_REMOTE_FS:-C:\\jenkins-agent}"
+      SONARQUBE_TOKEN: "${SONARQUBE_TOKEN:-}"
+      SONAR_HOST_URL: "${SONAR_HOST_URL:-http://sonarqube:9000}"
     group_add:
       - "${DOCKER_GID:-999}"
     healthcheck:

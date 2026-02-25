@@ -33,6 +33,11 @@
                 }
             }
         }
+        stage("SonarQube Analysis") {
+            steps {
+                echo "C/C++ requires SonarQube Developer Edition -- skipping analysis"
+            }
+        }
         stage("Extract Artifacts") {
             steps {
                 sh "rm -rf /tmp/esp32-app-firmware &amp;&amp; mkdir -p /tmp/esp32-app-firmware"

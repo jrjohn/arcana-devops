@@ -13,3 +13,4 @@ gradle
 matrix-auth
 pipeline-graph-view
 prometheus
+sonar
