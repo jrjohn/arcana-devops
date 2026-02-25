@@ -60,12 +60,11 @@ services:
     restart: unless-stopped
 
   sonarqube-exporter:
-    image: ekino/sonarqube-exporter:latest
+    image: return200/sonarqube-exporter:latest
     container_name: sonarqube-exporter
     environment:
       SONARQUBE_URL: "http://sonarqube:9000"
       SONARQUBE_TOKEN: "${SONARQUBE_TOKEN:-}"
-      METRICS_PORT: "9101"
     ports:
       - "9101:9101"
     restart: unless-stopped
