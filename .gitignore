@@ -3,6 +3,7 @@
 
 # Jenkins data
 jenkins_home/
+jenkins/secrets/
 
 # Logs
 *.log

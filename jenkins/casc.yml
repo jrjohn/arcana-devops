@@ -16,6 +16,56 @@ jenkins:
         env:
           - key: "DOCKER_REGISTRY"
             value: "${DOCKER_REGISTRY:-localhost:5000}"
+  nodes:
+    - permanent:
+        name: "macmini"
+        remoteFS: "/Users/jrjohn/jenkins-agent"
+        numExecutors: 2
+        mode: EXCLUSIVE
+        labelString: "macos ios"
+        retentionStrategy: "always"
+        launcher:
+          ssh:
+            host: "${MACMINI_HOST:-192.168.11.104}"
+            port: 22
+            credentialsId: "macmini-ssh"
+            sshHostKeyVerificationStrategy:
+              nonVerifyingKeyVerificationStrategy: {}
+    - permanent:
+        name: "windows"
+        remoteFS: "C:\\jenkins-agent"
+        numExecutors: 2
+        mode: EXCLUSIVE
+        labelString: "windows"
+        retentionStrategy: "always"
+        launcher:
+          ssh:
+            host: "${WINDOWS_HOST:-192.168.11.115}"
+            port: 22
+            credentialsId: "windows-ssh"
+            sshHostKeyVerificationStrategy:
+              nonVerifyingKeyVerificationStrategy: {}
+
+credentials:
+  system:
+    domainCredentials:
+      - credentials:
+          - basicSSHUserPrivateKey:
+              scope: GLOBAL
+              id: "macmini-ssh"
+              username: "${MACMINI_USER:-jrjohn}"
+              description: "Mac Mini SSH Key"
+              privateKeySource:
+                directEntry:
+                  privateKey: "${MACMINI_SSH_KEY}"
+          - basicSSHUserPrivateKey:
+              scope: GLOBAL
+              id: "windows-ssh"
+              username: "${WINDOWS_USER:-johnc}"
+              description: "Windows SSH Key"
+              privateKeySource:
+                directEntry:
+                  privateKey: "${WINDOWS_SSH_KEY}"
 
 unclassified:
   location:

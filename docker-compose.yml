@@ -14,12 +14,18 @@ services:
       - ./init:/usr/share/jenkins/ref/init.groovy.d:ro
       - ./samples:/var/jenkins_home/samples
       - ${PROJECTS_DIR:-./projects}:/home/jrjohn/devops-test
+      - ./jenkins/secrets:/run/secrets/jenkins:ro
     environment:
       JAVA_OPTS: "-Xmx1g -Xms512m -Duser.timezone=${TZ:-Asia/Taipei} -Djenkins.install.runSetupWizard=false"
       DOCKER_HOST: "unix:///var/run/docker.sock"
       CASC_JENKINS_CONFIG: "/var/jenkins_home/casc.yml"
+      SECRETS: "/run/secrets/jenkins"
       JENKINS_ADMIN_PASSWORD: "${JENKINS_ADMIN_PASSWORD:-admin}"
       DOCKER_REGISTRY: "${DOCKER_REGISTRY:-localhost:5000}"
+      MACMINI_HOST: "${MACMINI_HOST:-192.168.11.104}"
+      MACMINI_USER: "${MACMINI_USER:-jrjohn}"
+      WINDOWS_HOST: "${WINDOWS_HOST:-192.168.11.115}"
+      WINDOWS_USER: "${WINDOWS_USER:-johnc}"
     group_add:
       - "${DOCKER_GID:-999}"
     healthcheck:
