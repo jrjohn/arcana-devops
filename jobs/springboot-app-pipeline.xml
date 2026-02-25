@@ -29,7 +29,7 @@
         stage("Prepare CI Files") {
             steps {
                 writeFile file: "Dockerfile.ci", text: """\
-FROM eclipse-temurin:21-jdk AS builder
+FROM gradle:8.12-jdk21 AS builder
 WORKDIR /app
 COPY build.gradle.kts settings.gradle.kts gradle.properties ./
 COPY gradle gradle
@@ -41,8 +41,7 @@ COPY src src
 COPY config config
 COPY arcana-web arcana-web
 COPY bin bin
-RUN sed -i 's/gradle-8.10/gradle-8.12/' gradle/wrapper/gradle-wrapper.properties 2>/dev/null || true
-RUN ./gradlew build -x test --no-daemon
+RUN gradle build -x test --no-daemon
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 COPY --from=builder /app/build/libs/*-SNAPSHOT.jar app.jar
