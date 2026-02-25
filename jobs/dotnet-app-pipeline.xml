@@ -34,7 +34,9 @@ pipeline {
         stage('Unit Tests') {
             steps {
                 dir("${env.PROJECTS_DIR}/arcana-windows") {
-                    sh "docker compose run --rm dotnet-build dotnet test -c Release --no-build --logger \"trx;LogFilePrefix=results\" --results-directory /app/test-results || true"
+                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                        sh "docker compose -f docker-compose.test.yml run --rm --build test"
+                    }
                 }
             }
         }
@@ -49,7 +51,7 @@ pipeline {
                               -Dsonar.sources=src \
                               -Dsonar.exclusions=**/bin/**,**/obj/**,**/TestResults/**,**/*.cs \
                               -Dsonar.scm.disabled=true \
-                              -Dsonar.coverage.jacoco.xmlReportPaths='''
+                              -Dsonar.cs.opencover.reportsPaths=test-results/**/coverage.cobertura.xml'''
                         }
                     }
                 }

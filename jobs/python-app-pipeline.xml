@@ -34,6 +34,15 @@
                 }
             }
         }
+        stage("Unit Tests") {
+            steps {
+                dir("${env.PROJECTS_DIR}/arcana-cloud-python") {
+                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                        sh "docker compose -f docker-compose.test.yml run --rm --build test"
+                    }
+                }
+            }
+        }
         stage("SonarQube Analysis") {
             steps {
                 dir("${env.PROJECTS_DIR}/arcana-cloud-python") {
@@ -46,7 +55,7 @@
                               -Dsonar.exclusions=venv/**,**/__pycache__/** \
                               -Dsonar.python.version=3.12 \
                               -Dsonar.scm.disabled=true \
-                              -Dsonar.coverage.jacoco.xmlReportPaths='''
+                              -Dsonar.python.coverage.reportPaths=coverage/coverage.xml'''
                         }
                     }
                 }

@@ -34,6 +34,15 @@
                 }
             }
         }
+        stage("Unit Tests") {
+            steps {
+                dir("${env.PROJECTS_DIR}/arcana-cloud-rust") {
+                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                        sh "docker compose -f docker-compose.test.yml run --rm --build test"
+                    }
+                }
+            }
+        }
         stage("SonarQube Analysis") {
             steps {
                 dir("${env.PROJECTS_DIR}/arcana-cloud-rust") {
@@ -45,8 +54,7 @@
                               -Dsonar.sources=crates \
                               -Dsonar.exclusions=target/**,**/target/** \
                               -Dsonar.rust.clippy.enabled=false \
-                              -Dsonar.scm.disabled=true \
-                              -Dsonar.coverage.jacoco.xmlReportPaths='''
+                              -Dsonar.scm.disabled=true'''
                         }
                     }
                 }
