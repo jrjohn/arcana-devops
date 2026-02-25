@@ -12,6 +12,7 @@ services:
       - /usr/libexec/docker/cli-plugins:/usr/libexec/docker/cli-plugins:ro
       - ./jobs:/var/jenkins_home/jobs-config:ro
       - ./init:/usr/share/jenkins/ref/init.groovy.d:ro
+      - ./samples:/var/jenkins_home/samples:ro
     environment:
       JAVA_OPTS: "-Xmx1g -Xms512m -Duser.timezone=${TZ:-Asia/Taipei}"
       DOCKER_HOST: "unix:///var/run/docker.sock"

@@ -23,14 +23,14 @@
     stages {
         stage("Checkout") {
             steps {
-                echo "Using cloned repo: arcana-cloud-go"
+                echo "Using sample go-app from starter kit"
             }
         }
         stage("Docker Compose Build") {
             steps {
-                dir("/home/jrjohn/devops-test/arcana-cloud-go") {
-                    sh "VERSION=${VERSION} docker compose -f docker-compose.ci.yml build"
-                    sh "docker tag localhost:5000/arcana/${APP_NAME}:${VERSION} ${IMAGE_TAG}:build-${BUILD_NUMBER}"
+                dir("/var/jenkins_home/samples/go-app") {
+                    sh "VERSION=${VERSION} DOCKER_REGISTRY=${REGISTRY} docker compose -f docker-compose.ci.yml build"
+                    sh "docker tag ${IMAGE_TAG}:${VERSION} ${IMAGE_TAG}:build-${BUILD_NUMBER}"
                 }
             }
         }
