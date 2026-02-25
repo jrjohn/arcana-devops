@@ -53,7 +53,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(jenkins_builds_success_total) / (sum(jenkins_builds_success_total) + sum(jenkins_builds_failed_total)) * 100",
+          "expr": "sum(jenkins_runs_success_total) / (sum(jenkins_runs_success_total) + sum(jenkins_runs_failure_total)) * 100",
           "legendFormat": "Success Rate",
           "instant": true,
           "datasource": {
@@ -454,7 +454,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(rate(jenkins_builds_success_total[5m]))",
+          "expr": "sum(rate(jenkins_runs_success_total[5m]))",
           "legendFormat": "Success",
           "range": true,
           "datasource": {
@@ -464,7 +464,7 @@
         },
         {
           "refId": "B",
-          "expr": "sum(rate(jenkins_builds_failed_total[5m]))",
+          "expr": "sum(rate(jenkins_runs_failure_total[5m]))",
           "legendFormat": "Failed",
           "range": true,
           "datasource": {
@@ -897,7 +897,7 @@
         },
         {
           "refId": "B",
-          "expr": "jenkins_builds_success_total",
+          "expr": "jenkins_runs_success_total",
           "legendFormat": "",
           "instant": true,
           "format": "table",
@@ -908,7 +908,7 @@
         },
         {
           "refId": "C",
-          "expr": "jenkins_builds_failed_total",
+          "expr": "jenkins_runs_failure_total",
           "legendFormat": "",
           "instant": true,
           "format": "table",
