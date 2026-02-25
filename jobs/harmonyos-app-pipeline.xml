@@ -29,7 +29,7 @@
     stages {
         stage("Build HAP") {
             steps {
-                dir("/home/jrjohn/devops-test/arcana-harmonyos") {
+                dir("${env.PROJECTS_DIR}/arcana-harmonyos") {
                     sh "docker compose -f docker-compose.ci.yml build"
                     sh "docker compose -f docker-compose.ci.yml run --rm harmonyos-build"
                 }
@@ -37,7 +37,7 @@
         }
         stage("Verify HAP") {
             steps {
-                dir("/home/jrjohn/devops-test/arcana-harmonyos") {
+                dir("${env.PROJECTS_DIR}/arcana-harmonyos") {
                     sh "ls -la entry/build/default/outputs/default/*.hap 2&gt;/dev/null || echo HAP not found"
                 }
             }
@@ -47,7 +47,7 @@
         success { echo "HarmonyOS build succeeded: ${PROJECT_NAME}" }
         failure { echo "HarmonyOS build FAILED: ${PROJECT_NAME}" }
         always {
-            dir("/home/jrjohn/devops-test/arcana-harmonyos") {
+            dir("${env.PROJECTS_DIR}/arcana-harmonyos") {
                 sh "docker compose -f docker-compose.ci.yml down --remove-orphans 2&gt;/dev/null || true"
             }
         }

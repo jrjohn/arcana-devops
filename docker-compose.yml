@@ -13,7 +13,7 @@ services:
       - ./jobs:/var/jenkins_home/jobs-config:ro
       - ./init:/usr/share/jenkins/ref/init.groovy.d:ro
       - ./samples:/var/jenkins_home/samples
-      - ${PROJECTS_DIR:-./projects}:/home/jrjohn/devops-test
+      - ${PROJECTS_DIR}:${PROJECTS_DIR}
       - ./jenkins/secrets:/run/secrets/jenkins:ro
     environment:
       JAVA_OPTS: "-Xmx1g -Xms512m -Duser.timezone=${TZ:-Asia/Taipei} -Djenkins.install.runSetupWizard=false"
@@ -22,10 +22,13 @@ services:
       SECRETS: "/run/secrets/jenkins"
       JENKINS_ADMIN_PASSWORD: "${JENKINS_ADMIN_PASSWORD:-admin}"
       DOCKER_REGISTRY: "${DOCKER_REGISTRY:-localhost:5000}"
-      MACMINI_HOST: "${MACMINI_HOST:-192.168.11.104}"
-      MACMINI_USER: "${MACMINI_USER:-jrjohn}"
-      WINDOWS_HOST: "${WINDOWS_HOST:-192.168.11.115}"
-      WINDOWS_USER: "${WINDOWS_USER:-johnc}"
+      PROJECTS_DIR: "${PROJECTS_DIR}"
+      MACMINI_HOST: "${MACMINI_HOST:-}"
+      MACMINI_USER: "${MACMINI_USER:-}"
+      MACMINI_REMOTE_FS: "${MACMINI_REMOTE_FS:-/Users/jenkins/agent}"
+      WINDOWS_HOST: "${WINDOWS_HOST:-}"
+      WINDOWS_USER: "${WINDOWS_USER:-}"
+      WINDOWS_REMOTE_FS: "${WINDOWS_REMOTE_FS:-C:\\jenkins-agent}"
     group_add:
       - "${DOCKER_GID:-999}"
     healthcheck:

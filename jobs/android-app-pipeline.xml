@@ -31,7 +31,7 @@
     agent any
     environment {
         PROJECT_NAME = "android-app"
-        PROJECT_DIR  = "/home/jrjohn/devops-test/arcana-android"
+        PROJECT_DIR  = "${env.PROJECTS_DIR}/arcana-android"
     }
     options {
         timeout(time: 60, unit: "MINUTES")

@@ -8,7 +8,7 @@ pipeline {
     agent any
     environment {
         APP_NAME  = 'dotnet-app'
-        REGISTRY  = 'arcana.boo/arcana'
+        REGISTRY  = 'localhost:5000/arcana'
         IMAGE_TAG = "${REGISTRY}/${APP_NAME}"
         VERSION   = '0.2.0'
     }
@@ -25,7 +25,7 @@ pipeline {
         }
         stage('Docker Build') {
             steps {
-                dir('/home/jrjohn/devops-test/arcana-windows') {
+                dir("${env.PROJECTS_DIR}/arcana-windows") {
                     sh "VERSION=${VERSION} docker compose build"
                     sh "docker tag ${IMAGE_TAG}:${VERSION} ${IMAGE_TAG}:build-${BUILD_NUMBER}"
                 }
@@ -33,7 +33,7 @@ pipeline {
         }
         stage('Unit Tests') {
             steps {
-                dir('/home/jrjohn/devops-test/arcana-windows') {
+                dir("${env.PROJECTS_DIR}/arcana-windows") {
                     sh "docker compose run --rm dotnet-build dotnet test -c Release --no-build --logger \"trx;LogFileName=results.trx\" --results-directory /app/test-results || true"
                 }
             }

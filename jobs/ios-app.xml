@@ -42,7 +42,7 @@
     stages {
         stage("Checkout") {
             steps {
-                dir("/Users/jrjohn/devops-test/arcana-ios") {
+                dir("/Users/jenkins/devops-test/arcana-ios") {
                     script { env.VERSION = "1.0.0" }
                     echo "Building ${PROJECT_NAME} v${VERSION}"
                 }
@@ -50,14 +50,14 @@
         }
         stage("Build") {
             steps {
-                dir("/Users/jrjohn/devops-test/arcana-ios") {
+                dir("/Users/jenkins/devops-test/arcana-ios") {
                     sh "xcodebuild -project arcana-ios.xcodeproj -scheme arcana-ios -configuration Release -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO build 2&gt;&amp;1 | tail -20"
                 }
             }
         }
         stage("Test") {
             steps {
-                dir("/Users/jrjohn/devops-test/arcana-ios") {
+                dir("/Users/jenkins/devops-test/arcana-ios") {
                     sh "xcodebuild -project arcana-ios.xcodeproj -scheme arcana-ios -destination 'platform=iOS Simulator,name=iPhone 16' test 2&gt;&amp;1 | tail -30"
                 }
             }

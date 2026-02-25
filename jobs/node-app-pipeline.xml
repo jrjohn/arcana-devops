@@ -28,7 +28,7 @@
         }
         stage("Docker Compose Build") {
             steps {
-                dir("/home/jrjohn/devops-test/arcana-cloud-nodejs") {
+                dir("${env.PROJECTS_DIR}/arcana-cloud-nodejs") {
                     sh "VERSION=${VERSION} docker compose -f docker-compose.ci.yml build"
                     sh "docker tag localhost:5000/arcana/${APP_NAME}:${VERSION} ${IMAGE_TAG}:build-${BUILD_NUMBER}"
                 }

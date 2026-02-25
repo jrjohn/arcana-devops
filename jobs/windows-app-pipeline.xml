@@ -34,7 +34,7 @@
     environment {
         APP_NAME    = &apos;arcana-windows&apos;
         VERSION     = &apos;0.1.0&apos;
-        PROJECT_DIR = &apos;C:\\Users\\johnc\\devops-test\\arcana-windows&apos;
+        PROJECT_DIR = &apos;C:\\Users\\jenkins\\devops-test\\arcana-windows&apos;
     }
     options {
         timeout(time: 30, unit: &apos;MINUTES&apos;)
