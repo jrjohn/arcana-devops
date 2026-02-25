@@ -26,10 +26,43 @@
                 git url: "https://github.com/jrjohn/arcana-cloud-springboot.git", branch: "main"
             }
         }
+        stage("Prepare CI Files") {
+            steps {
+                writeFile file: "Dockerfile.ci", text: """\
+FROM eclipse-temurin:21-jdk AS builder
+WORKDIR /app
+COPY build.gradle.kts settings.gradle.kts gradle.properties ./
+COPY gradle gradle
+COPY arcana-plugin-api arcana-plugin-api
+COPY arcana-plugin-runtime arcana-plugin-runtime
+COPY arcana-ssr-engine arcana-ssr-engine
+COPY plugins plugins
+COPY src src
+COPY config config
+COPY arcana-web arcana-web
+COPY bin bin
+RUN sed -i 's/gradle-8.10/gradle-8.12/' gradle/wrapper/gradle-wrapper.properties 2>/dev/null || true
+RUN ./gradlew build -x test --no-daemon
+FROM eclipse-temurin:21-jre-alpine
+WORKDIR /app
+COPY --from=builder /app/build/libs/*-SNAPSHOT.jar app.jar
+EXPOSE 8080
+ENTRYPOINT ["java", "-jar", "app.jar"]
+"""
+                writeFile file: "docker-compose.ci.yml", text: """\
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.ci
+    image: ${REGISTRY}/arcana/${APP_NAME}:${VERSION}
+"""
+            }
+        }
         stage("Docker Compose Build") {
             steps {
                 sh "VERSION=${VERSION} docker compose -f docker-compose.ci.yml build"
-                sh "docker tag ${REGISTRY}/arcana/${APP_NAME}:${VERSION} ${IMAGE_TAG}:build-${BUILD_NUMBER}"
+                sh "docker tag ${IMAGE_TAG}:${VERSION} ${IMAGE_TAG}:build-${BUILD_NUMBER}"
             }
         }
         stage("Image Info") {
