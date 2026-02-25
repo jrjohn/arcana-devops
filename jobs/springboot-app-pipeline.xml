@@ -16,52 +16,22 @@
     agent any
     environment {
         APP_NAME  = "springboot-app"
-        REGISTRY  = "${DOCKER_REGISTRY}"
+        REGISTRY  = "localhost:5000"
         IMAGE_TAG = "${REGISTRY}/arcana/${APP_NAME}"
         VERSION   = "1.0.0"
     }
     stages {
         stage("Checkout") {
             steps {
-                git url: "https://github.com/jrjohn/arcana-cloud-springboot.git", branch: "main"
-            }
-        }
-        stage("Prepare CI Files") {
-            steps {
-                writeFile file: "Dockerfile.ci", text: """\
-FROM gradle:jdk21 AS builder
-WORKDIR /app
-COPY build.gradle.kts settings.gradle.kts gradle.properties ./
-COPY gradle gradle
-COPY arcana-plugin-api arcana-plugin-api
-COPY arcana-plugin-runtime arcana-plugin-runtime
-COPY arcana-ssr-engine arcana-ssr-engine
-COPY plugins plugins
-COPY src src
-COPY config config
-COPY arcana-web arcana-web
-COPY bin bin
-RUN gradle build -x test --no-daemon
-FROM eclipse-temurin:21-jre-alpine
-WORKDIR /app
-COPY --from=builder /app/build/libs/*-SNAPSHOT.jar app.jar
-EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "app.jar"]
-"""
-                writeFile file: "docker-compose.ci.yml", text: """\
-services:
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile.ci
-    image: ${REGISTRY}/arcana/${APP_NAME}:${VERSION}
-"""
+                echo "Using cloned repo: arcana-cloud-springboot"
             }
         }
         stage("Docker Compose Build") {
             steps {
-                sh "VERSION=${VERSION} docker compose -f docker-compose.ci.yml build"
-                sh "docker tag ${IMAGE_TAG}:${VERSION} ${IMAGE_TAG}:build-${BUILD_NUMBER}"
+                dir("/home/jrjohn/devops-test/arcana-cloud-springboot") {
+                    sh "VERSION=${VERSION} docker compose -f docker-compose.ci.yml build"
+                    sh "docker tag localhost:5000/arcana/${APP_NAME}:${VERSION} ${IMAGE_TAG}:build-${BUILD_NUMBER}"
+                }
             }
         }
         stage("Image Info") {
@@ -82,6 +52,7 @@ services:
         always  { echo "Build number ${BUILD_NUMBER} done" }
     }
 }
+
 </script>
     <sandbox>true</sandbox>
   </definition>

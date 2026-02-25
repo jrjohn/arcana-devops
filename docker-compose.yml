@@ -13,6 +13,7 @@ services:
       - ./jobs:/var/jenkins_home/jobs-config:ro
       - ./init:/usr/share/jenkins/ref/init.groovy.d:ro
       - ./samples:/var/jenkins_home/samples
+      - ${PROJECTS_DIR:-./projects}:/home/jrjohn/devops-test
     environment:
       JAVA_OPTS: "-Xmx1g -Xms512m -Duser.timezone=${TZ:-Asia/Taipei} -Djenkins.install.runSetupWizard=false"
       DOCKER_HOST: "unix:///var/run/docker.sock"
