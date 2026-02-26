@@ -14,6 +14,9 @@
   <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@4256.v991a_f1991c03">
     <script>pipeline {
     agent any
+    triggers {
+        pollSCM('H/5 * * * *')
+    }
     environment {
         APP_NAME  = "go-app"
         REGISTRY  = "localhost:5000"
@@ -23,12 +26,15 @@
     stages {
         stage("Checkout") {
             steps {
-                echo "Using sample go-app from starter kit"
+                dir("${env.PROJECTS_DIR}/arcana-cloud-go") {
+                    git url: 'https://github.com/jrjohn/arcana-cloud-go.git',
+                        branch: 'main', credentialsId: 'github-credentials'
+                }
             }
         }
         stage("Docker Compose Build") {
             steps {
-                dir("/var/jenkins_home/samples/go-app") {
+                dir("${env.PROJECTS_DIR}/arcana-cloud-go") {
                     sh "VERSION=${VERSION} DOCKER_REGISTRY=${REGISTRY} docker compose -f docker-compose.ci.yml build"
                     sh "docker tag ${IMAGE_TAG}:${VERSION} ${IMAGE_TAG}:build-${BUILD_NUMBER}"
                 }
@@ -36,7 +42,7 @@
         }
         stage("SonarQube Analysis") {
             steps {
-                dir("/var/jenkins_home/samples/go-app") {
+                dir("${env.PROJECTS_DIR}/arcana-cloud-go") {
                     catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
                         withSonarQubeEnv('SonarQube') {
                             sh '''sonar-scanner \

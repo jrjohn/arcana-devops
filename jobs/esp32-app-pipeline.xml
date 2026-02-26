@@ -14,6 +14,9 @@
   <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@4256.v991a_f1991c03">
     <script>pipeline {
     agent any
+    triggers {
+        pollSCM('H/5 * * * *')
+    }
     environment {
         APP_NAME    = "esp32-app"
         VERSION     = "1.0.0"
@@ -21,7 +24,12 @@
     }
     stages {
         stage("Checkout") {
-            steps { echo "Using cloned repo: arcana-embedded-esp32" }
+            steps {
+                dir("${env.PROJECTS_DIR}/arcana-embedded-esp32") {
+                    git url: 'https://github.com/jrjohn/arcana-embedded-esp32.git',
+                        branch: 'main', credentialsId: 'github-credentials'
+                }
+            }
         }
         stage("Pull Build Image") {
             steps { sh "docker pull espressif/idf:v5.5.2" }

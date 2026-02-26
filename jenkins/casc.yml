@@ -27,12 +27,8 @@ jenkins:
         labelString: "macos ios"
         retentionStrategy: "always"
         launcher:
-          ssh:
-            host: "${MACMINI_HOST}"
-            port: 22
-            credentialsId: "macmini-ssh"
-            sshHostKeyVerificationStrategy:
-              nonVerifyingKeyVerificationStrategy: {}
+          jnlp:
+            webSocket: true
     - permanent:
         name: "windows"
         remoteFS: "${WINDOWS_REMOTE_FS:-C:\\jenkins-agent}"
@@ -41,12 +37,8 @@ jenkins:
         labelString: "windows"
         retentionStrategy: "always"
         launcher:
-          ssh:
-            host: "${WINDOWS_HOST}"
-            port: 22
-            credentialsId: "windows-ssh"
-            sshHostKeyVerificationStrategy:
-              nonVerifyingKeyVerificationStrategy: {}
+          jnlp:
+            webSocket: true
 
 credentials:
   system:
@@ -73,13 +65,19 @@ credentials:
               id: "sonarqube-token"
               description: "SonarQube Authentication Token"
               secret: "${SONARQUBE_TOKEN}"
+          - usernamePassword:
+              scope: GLOBAL
+              id: "github-credentials"
+              username: "jrjohn"
+              password: "${GITHUB_TOKEN}"
+              description: "GitHub PAT for SCM polling"
 
 unclassified:
   location:
-    url: "${JENKINS_URL:-http://localhost:8080/}"
+    url: "${JENKINS_URL:-https://arcana.boo/jenkins/}"
   sonarGlobalConfiguration:
     buildWrapperEnabled: true
     installations:
       - name: "SonarQube"
-        serverUrl: "${SONAR_HOST_URL:-http://sonarqube:9000}"
+        serverUrl: "${SONAR_HOST_URL:-http://sonarqube:9000/sonarqube}"
         credentialsId: "sonarqube-token"

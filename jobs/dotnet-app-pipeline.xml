@@ -6,6 +6,9 @@
     <script>
 pipeline {
     agent any
+    triggers {
+        pollSCM('H/5 * * * *')
+    }
     environment {
         APP_NAME  = 'dotnet-app'
         REGISTRY  = 'localhost:5000/arcana'
@@ -20,7 +23,10 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                echo "Building arcana-windows (cross-platform .NET) v${VERSION}"
+                dir("${env.PROJECTS_DIR}/arcana-windows") {
+                    git url: 'https://github.com/jrjohn/arcana-windows.git',
+                        branch: 'main', credentialsId: 'github-credentials'
+                }
             }
         }
         stage('Docker Build') {

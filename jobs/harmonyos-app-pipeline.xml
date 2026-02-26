@@ -19,6 +19,9 @@
   <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@4256.v991a_f1991c03">
     <script>pipeline {
     agent any
+    triggers {
+        pollSCM('H/5 * * * *')
+    }
     environment {
         PROJECT_NAME = "harmonyos-app"
     }
@@ -27,6 +30,14 @@
         disableConcurrentBuilds()
     }
     stages {
+        stage("Checkout") {
+            steps {
+                dir("${env.PROJECTS_DIR}/arcana-harmonyos") {
+                    git url: 'https://github.com/jrjohn/arcana-harmonyos.git',
+                        branch: 'main', credentialsId: 'github-credentials'
+                }
+            }
+        }
         stage("Build HAP") {
             steps {
                 dir("${env.PROJECTS_DIR}/arcana-harmonyos") {

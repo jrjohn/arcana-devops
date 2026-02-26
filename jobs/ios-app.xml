@@ -30,8 +30,12 @@
   <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@4256.v991a_f1991c03">
     <script>pipeline {
     agent { label "macos" }
+    triggers {
+        pollSCM('H/5 * * * *')
+    }
     environment {
         PROJECT_NAME = "arcana-ios"
+        VERSION      = "1.0.0"
         PATH = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
     }
     options {
@@ -42,24 +46,18 @@
     stages {
         stage("Checkout") {
             steps {
-                dir("/Users/jenkins/devops-test/arcana-ios") {
-                    script { env.VERSION = "1.0.0" }
-                    echo "Building ${PROJECT_NAME} v${VERSION}"
-                }
+                git url: 'https://github.com/jrjohn/arcana-ios.git',
+                    branch: 'main', credentialsId: 'github-credentials'
             }
         }
         stage("Build") {
             steps {
-                dir("/Users/jenkins/devops-test/arcana-ios") {
-                    sh "xcodebuild -project arcana-ios.xcodeproj -scheme arcana-ios -configuration Release -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO build 2&gt;&amp;1 | tail -20"
-                }
+                sh "xcodebuild -project arcana-ios.xcodeproj -scheme arcana-ios -configuration Release -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO build 2&gt;&amp;1 | tail -20"
             }
         }
         stage("Test") {
             steps {
-                dir("/Users/jenkins/devops-test/arcana-ios") {
-                    sh "xcodebuild -project arcana-ios.xcodeproj -scheme arcana-ios -destination 'platform=iOS Simulator,name=iPhone 17' test 2&gt;&amp;1 | tail -30"
-                }
+                sh "xcodebuild -project arcana-ios.xcodeproj -scheme arcana-ios -destination 'platform=iOS Simulator,name=iPhone 17' test 2&gt;&amp;1 | tail -30"
             }
         }
         stage("SonarQube Analysis") {

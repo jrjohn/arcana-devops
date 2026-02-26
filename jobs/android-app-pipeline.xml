@@ -29,6 +29,9 @@
   <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@4256.v991a_f1991c03">
     <script>pipeline {
     agent any
+    triggers {
+        pollSCM('H/5 * * * *')
+    }
     environment {
         PROJECT_NAME = "android-app"
         PROJECT_DIR  = "${env.PROJECTS_DIR}/arcana-android"
@@ -40,7 +43,12 @@
     }
     stages {
         stage("Checkout") {
-            steps { echo "Using cloned repo: arcana-android" }
+            steps {
+                dir("${env.PROJECTS_DIR}/arcana-android") {
+                    git url: 'https://github.com/jrjohn/arcana-android.git',
+                        branch: 'main', credentialsId: 'github-credentials'
+                }
+            }
         }
         stage("Docker Compose Build") {
             steps {
