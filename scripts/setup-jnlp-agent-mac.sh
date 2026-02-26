@@ -46,7 +46,7 @@ cat > "$PLIST_PATH" << EOF
     <string>$PLIST_NAME</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/opt/homebrew/bin/java</string>
+        <string>$(which java)</string>
         <string>-jar</string>
         <string>$AGENT_JAR</string>
         <string>-url</string>
