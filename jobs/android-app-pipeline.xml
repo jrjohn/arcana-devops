@@ -37,7 +37,7 @@
         PROJECT_DIR  = "${env.PROJECTS_DIR}/arcana-android"
     }
     options {
-        timeout(time: 60, unit: "MINUTES")
+        timeout(time: 90, unit: "MINUTES")
         disableConcurrentBuilds()
         buildDiscarder(logRotator(numToKeepStr: "10"))
     }
