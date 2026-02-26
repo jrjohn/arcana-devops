@@ -46,8 +46,16 @@
     stages {
         stage("Checkout") {
             steps {
-                git url: 'https://github.com/jrjohn/arcana-ios.git',
-                    branch: 'main', credentialsId: 'github-credentials'
+                withCredentials([usernamePassword(credentialsId: 'github-credentials', usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS')]) {
+                    sh '''
+                        if [ -d .git ]; then
+                            git fetch --tags --force --progress https://${GIT_USER}:${GIT_PASS}@github.com/jrjohn/arcana-ios.git +refs/heads/*:refs/remotes/origin/*
+                            git checkout -f origin/main
+                        else
+                            git clone --branch main https://${GIT_USER}:${GIT_PASS}@github.com/jrjohn/arcana-ios.git .
+                        fi
+                    '''
+                }
             }
         }
         stage("Build") {

@@ -46,8 +46,9 @@
     stages {
         stage(&apos;Checkout&apos;) {
             steps {
-                git url: &apos;https://github.com/jrjohn/arcana-windows.git&apos;,
-                    branch: &apos;main&apos;, credentialsId: &apos;github-credentials&apos;
+                withCredentials([usernamePassword(credentialsId: &apos;github-credentials&apos;, usernameVariable: &apos;GIT_USER&apos;, passwordVariable: &apos;GIT_PASS&apos;)]) {
+                    bat &quot;if exist .git (git fetch --tags --force --progress https://%GIT_USER%:%GIT_PASS%@github.com/jrjohn/arcana-windows.git +refs/heads/*:refs/remotes/origin/* &amp;&amp; git checkout -f origin/main) else (git clone --branch main https://%GIT_USER%:%GIT_PASS%@github.com/jrjohn/arcana-windows.git .)&quot;
+                }
             }
         }
         stage(&apos;Restore&apos;) {
