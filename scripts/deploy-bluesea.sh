@@ -59,6 +59,13 @@ DOCKER_GID=$(getent group docker | cut -d: -f3)
 log "Docker GID: $DOCKER_GID"
 sed -i "s/^DOCKER_GID=.*/DOCKER_GID=$DOCKER_GID/" "$PROJECT_DIR/.env"
 
+# ── QEMU for cross-platform builds ───────────
+if [ ! -f /proc/sys/fs/binfmt_misc/qemu-x86_64 ] 2>/dev/null; then
+    log "Installing QEMU x86_64 emulation for Android/HarmonyOS builds..."
+    docker run --rm --privileged tonistiigi/binfmt --install amd64 >/dev/null 2>&1 || true
+    log "QEMU x86_64 emulation installed"
+fi
+
 # ── Build custom Jenkins image ────────────────
 log "Building custom Jenkins image..."
 cd "$PROJECT_DIR"
@@ -77,7 +84,7 @@ if [ -d /etc/nginx ]; then
     log "Installing nginx config..."
     sudo cp "$PROJECT_DIR/nginx/arcana-devops.conf" /etc/nginx/conf.d/arcana-devops.conf
     if sudo nginx -t 2>&1; then
-        sudo systemctl reload nginx
+        sudo systemctl reload nginx || sudo nginx -s reload
         log "Nginx reloaded successfully"
     else
         err "Nginx config test failed — check /etc/nginx/conf.d/arcana-devops.conf"
@@ -129,6 +136,26 @@ for i in $(seq 1 15); do
     [ "$i" -eq 15 ] && echo -e "${RED}TIMEOUT${NC}"
     sleep 3
 done
+
+# ── Auto-configure SonarQube token ────────────
+if grep -q '^SONARQUBE_TOKEN=$' "$PROJECT_DIR/.env" 2>/dev/null; then
+    log "Generating SonarQube analysis token..."
+    SQ_TOKEN=$(curl -sf -u admin:admin -X POST \
+        "http://127.0.0.1:9000/sonarqube/api/user_tokens/generate" \
+        -d "name=jenkins-ci&type=GLOBAL_ANALYSIS_TOKEN" 2>/dev/null \
+        | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])" 2>/dev/null || true)
+    if [ -n "$SQ_TOKEN" ]; then
+        sed -i "s|^SONARQUBE_TOKEN=.*|SONARQUBE_TOKEN=$SQ_TOKEN|" "$PROJECT_DIR/.env"
+        log "SonarQube token generated and saved to .env"
+        log "Restarting Jenkins + exporter to pick up token..."
+        docker compose restart jenkins
+        docker compose -f docker-compose.monitoring.yml restart sonarqube-exporter
+    else
+        warn "Could not auto-generate SonarQube token."
+        warn "  Generate manually: SonarQube -> My Account -> Security -> Generate Token"
+        warn "  Then set SONARQUBE_TOKEN in .env and restart Jenkins"
+    fi
+fi
 
 # ── Summary ───────────────────────────────────
 log ""
