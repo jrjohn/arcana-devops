@@ -80,19 +80,24 @@ log "Starting monitoring stack..."
 docker compose -f docker-compose.monitoring.yml up -d --build
 
 # ── Install nginx config ─────────────────────
+# arcana-devops.conf is an includable snippet (location blocks only).
+# It must be included inside an existing server block, NOT placed in conf.d/.
+# Example: include /data/devops/nginx/arcana-devops.conf;
 if [ -d /etc/nginx ]; then
-    log "Installing nginx config..."
-    sudo cp "$PROJECT_DIR/nginx/arcana-devops.conf" /etc/nginx/conf.d/arcana-devops.conf
-    if sudo nginx -t 2>&1; then
-        sudo systemctl reload nginx || sudo nginx -s reload
-        log "Nginx reloaded successfully"
+    if ! grep -rq "arcana-devops.conf" /etc/nginx/ 2>/dev/null; then
+        warn "Nginx config not yet included. Add this line inside your server block:"
+        warn "  include $PROJECT_DIR/nginx/arcana-devops.conf;"
+        warn "Then run: sudo nginx -t && sudo nginx -s reload"
     else
-        err "Nginx config test failed — check /etc/nginx/conf.d/arcana-devops.conf"
-        exit 1
+        log "Nginx config already included, reloading..."
+        if sudo nginx -t 2>&1; then
+            sudo systemctl reload nginx || sudo nginx -s reload
+            log "Nginx reloaded successfully"
+        else
+            err "Nginx config test failed"
+            exit 1
+        fi
     fi
-else
-    warn "Nginx not found. Install the config manually:"
-    warn "  sudo cp $PROJECT_DIR/nginx/arcana-devops.conf /etc/nginx/conf.d/"
 fi
 
 # ── Health checks ─────────────────────────────
