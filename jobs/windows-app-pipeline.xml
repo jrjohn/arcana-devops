@@ -53,7 +53,7 @@
         }
         stage(&apos;Restore&apos;) {
             steps {
-                bat &quot;dotnet restore Arcana.Windows.sln&quot;
+                bat &quot;dotnet restore Arcana.Windows.sln --force-evaluate&quot;
             }
         }
         stage(&apos;Build&apos;) {
