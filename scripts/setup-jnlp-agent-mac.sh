@@ -13,7 +13,7 @@ set -euo pipefail
 
 JENKINS_URL="https://arcana.boo/jenkins/"
 AGENT_NAME="macmini"
-AGENT_DIR="/Users/jenkins/agent"
+AGENT_DIR="$HOME/jenkins-agent"
 AGENT_JAR="$AGENT_DIR/agent.jar"
 PLIST_NAME="com.jenkins.agent"
 PLIST_PATH="$HOME/Library/LaunchAgents/$PLIST_NAME.plist"

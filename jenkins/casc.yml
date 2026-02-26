@@ -21,7 +21,7 @@ jenkins:
   nodes:
     - permanent:
         name: "macmini"
-        remoteFS: "${MACMINI_REMOTE_FS:-/Users/jenkins/agent}"
+        remoteFS: "${MACMINI_REMOTE_FS:-/Users/jrjohn/jenkins-agent}"
         numExecutors: 2
         mode: EXCLUSIVE
         labelString: "macos ios"
