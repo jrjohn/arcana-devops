@@ -137,24 +137,38 @@ for i in $(seq 1 15); do
     sleep 3
 done
 
-# ── Auto-configure SonarQube token ────────────
+# ── Auto-configure SonarQube tokens ───────────
+NEED_RESTART=false
 if grep -q '^SONARQUBE_TOKEN=$' "$PROJECT_DIR/.env" 2>/dev/null; then
-    log "Generating SonarQube analysis token..."
+    log "Generating SonarQube analysis token (GLOBAL_ANALYSIS_TOKEN)..."
     SQ_TOKEN=$(curl -sf -u admin:admin -X POST \
         "http://127.0.0.1:9000/sonarqube/api/user_tokens/generate" \
         -d "name=jenkins-ci&type=GLOBAL_ANALYSIS_TOKEN" 2>/dev/null \
         | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])" 2>/dev/null || true)
     if [ -n "$SQ_TOKEN" ]; then
         sed -i "s|^SONARQUBE_TOKEN=.*|SONARQUBE_TOKEN=$SQ_TOKEN|" "$PROJECT_DIR/.env"
-        log "SonarQube token generated and saved to .env"
-        log "Recreating Jenkins + exporter to pick up token..."
-        docker compose up -d jenkins
-        docker compose -f docker-compose.monitoring.yml up -d sonarqube-exporter
+        log "SonarQube analysis token saved"
+        NEED_RESTART=true
     else
-        warn "Could not auto-generate SonarQube token."
-        warn "  Generate manually: SonarQube -> My Account -> Security -> Generate Token"
-        warn "  Then set SONARQUBE_TOKEN in .env and restart Jenkins"
+        warn "Could not auto-generate SonarQube token (change default password first?)"
     fi
+fi
+if grep -q '^SONARQUBE_EXPORTER_TOKEN=$' "$PROJECT_DIR/.env" 2>/dev/null; then
+    log "Generating SonarQube exporter token (USER_TOKEN)..."
+    SQ_EXP_TOKEN=$(curl -sf -u admin:admin -X POST \
+        "http://127.0.0.1:9000/sonarqube/api/user_tokens/generate" \
+        -d "name=exporter&type=USER_TOKEN" 2>/dev/null \
+        | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])" 2>/dev/null || true)
+    if [ -n "$SQ_EXP_TOKEN" ]; then
+        sed -i "s|^SONARQUBE_EXPORTER_TOKEN=.*|SONARQUBE_EXPORTER_TOKEN=$SQ_EXP_TOKEN|" "$PROJECT_DIR/.env"
+        log "SonarQube exporter token saved"
+        NEED_RESTART=true
+    fi
+fi
+if [ "$NEED_RESTART" = true ]; then
+    log "Recreating services to pick up new tokens..."
+    docker compose up -d jenkins
+    docker compose -f docker-compose.monitoring.yml up -d sonarqube-exporter
 fi
 
 # ── Summary ───────────────────────────────────
