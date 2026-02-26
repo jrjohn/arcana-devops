@@ -68,7 +68,7 @@ services:
     container_name: sonarqube-exporter
     environment:
       SONARQUBE_URL: "http://sonarqube:9000/sonarqube"
-      SONARQUBE_TOKEN: "${SONARQUBE_TOKEN:-}"
+      SONARQUBE_TOKEN: "${SONARQUBE_EXPORTER_TOKEN:-${SONARQUBE_TOKEN:-}}"
       POLL_INTERVAL: "60"
       METRICS_PORT: "9101"
     ports:
