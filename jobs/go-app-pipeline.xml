@@ -49,7 +49,7 @@
                               -Dsonar.projectKey=go-app \
                               -Dsonar.projectName="Go App" \
                               -Dsonar.sources=. \
-                              -Dsonar.exclusions=vendor/**,*_test.go \
+                              -Dsonar.exclusions=vendor/**,**/*_test.go,**/testutil/**,**/mocks/** \
                               -Dsonar.text.inclusions.activate=false \
                               -Dsonar.scm.disabled=true \
                               -Dsonar.coverage.jacoco.xmlReportPaths='''

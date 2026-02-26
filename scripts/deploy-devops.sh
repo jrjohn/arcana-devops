@@ -147,9 +147,9 @@ if grep -q '^SONARQUBE_TOKEN=$' "$PROJECT_DIR/.env" 2>/dev/null; then
     if [ -n "$SQ_TOKEN" ]; then
         sed -i "s|^SONARQUBE_TOKEN=.*|SONARQUBE_TOKEN=$SQ_TOKEN|" "$PROJECT_DIR/.env"
         log "SonarQube token generated and saved to .env"
-        log "Restarting Jenkins + exporter to pick up token..."
-        docker compose restart jenkins
-        docker compose -f docker-compose.monitoring.yml restart sonarqube-exporter
+        log "Recreating Jenkins + exporter to pick up token..."
+        docker compose up -d jenkins
+        docker compose -f docker-compose.monitoring.yml up -d sonarqube-exporter
     else
         warn "Could not auto-generate SonarQube token."
         warn "  Generate manually: SonarQube -> My Account -> Security -> Generate Token"
