@@ -1,4 +1,4 @@
-# Set up Jenkins JNLP agent on Windows as a Windows service
+# Set up Jenkins JNLP agent on Windows as a Scheduled Task (auto-start at logon)
 # Connects outbound to https://arcana.boo/jenkins/ via WebSocket
 #
 # Prerequisites:
@@ -17,7 +17,7 @@ $JenkinsUrl = "https://arcana.boo/jenkins/"
 $AgentName = "windows"
 $AgentDir = "C:\jenkins-agent"
 $AgentJar = "$AgentDir\agent.jar"
-$ServiceName = "JenkinsAgent"
+$TaskName = "JenkinsAgent"
 
 # ── Check admin ───────────────────────────────
 $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
@@ -27,12 +27,12 @@ if (-not $isAdmin) {
 }
 
 # ── Check Java ────────────────────────────────
-try {
-    $null = & java -version 2>&1
-} catch {
+$JavaPath = (Get-Command java -ErrorAction SilentlyContinue).Source
+if (-not $JavaPath) {
     Write-Error "Java not found. Install Java 17+: winget install Microsoft.OpenJDK.17"
     exit 1
 }
+Write-Host "Java found: $JavaPath"
 
 # ── Setup directory ───────────────────────────
 Write-Host "Setting up Jenkins JNLP agent..."
@@ -40,58 +40,63 @@ New-Item -ItemType Directory -Force -Path $AgentDir | Out-Null
 
 # ── Download agent.jar ────────────────────────
 Write-Host "Downloading agent.jar..."
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 Invoke-WebRequest -Uri "${JenkinsUrl}jnlpJars/agent.jar" -OutFile $AgentJar
 
-# ── Stop existing service ─────────────────────
-if (Get-Service -Name $ServiceName -ErrorAction SilentlyContinue) {
-    Write-Host "Stopping existing service..."
-    Stop-Service -Name $ServiceName -Force -ErrorAction SilentlyContinue
-    & sc.exe delete $ServiceName 2>$null
+if (-not (Test-Path $AgentJar)) {
+    Write-Error "Failed to download agent.jar"
+    exit 1
+}
+
+# ── Create wrapper script ─────────────────────
+$WrapperScript = @"
+@echo off
+:loop
+"$JavaPath" -jar "$AgentJar" -url "$JenkinsUrl" -name "$AgentName" -secret "$Secret" -workDir "$AgentDir" -webSocket
+echo Agent exited, restarting in 10 seconds...
+timeout /t 10 /nobreak >nul
+goto loop
+"@
+Set-Content -Path "$AgentDir\run-agent.bat" -Value $WrapperScript -Encoding ASCII
+
+# ── Remove existing scheduled task ────────────
+if (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue) {
+    Write-Host "Removing existing scheduled task..."
+    Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+    Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false
     Start-Sleep -Seconds 2
 }
 
-# ── Create wrapper script ────────────────────
-$WrapperScript = @"
-@echo off
-java -jar "$AgentJar" -url "$JenkinsUrl" -name "$AgentName" -secret "$Secret" -workDir "$AgentDir" -webSocket
-"@
-Set-Content -Path "$AgentDir\run-agent.bat" -Value $WrapperScript
+# ── Create scheduled task ─────────────────────
+Write-Host "Creating scheduled task..."
+$Action = New-ScheduledTaskAction -Execute "$AgentDir\run-agent.bat" -WorkingDirectory $AgentDir
+$Trigger = New-ScheduledTaskTrigger -AtLogon
+$Settings = New-ScheduledTaskSettingsSet `
+    -AllowStartIfOnBatteries `
+    -DontStopIfGoingOnBatteries `
+    -RestartInterval (New-TimeSpan -Minutes 1) `
+    -RestartCount 999 `
+    -ExecutionTimeLimit (New-TimeSpan -Days 0)
+$Principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive -RunLevel Highest
 
-# ── Create Windows service using sc.exe ───────
-# Using NSSM (Non-Sucking Service Manager) for reliable service wrapping
-$NssmPath = "$AgentDir\nssm.exe"
-if (-not (Test-Path $NssmPath)) {
-    Write-Host "Downloading NSSM..."
-    $NssmZip = "$AgentDir\nssm.zip"
-    Invoke-WebRequest -Uri "https://nssm.cc/release/nssm-2.24.zip" -OutFile $NssmZip
-    Expand-Archive -Path $NssmZip -DestinationPath "$AgentDir\nssm-tmp" -Force
-    Copy-Item "$AgentDir\nssm-tmp\nssm-2.24\win64\nssm.exe" $NssmPath
-    Remove-Item -Recurse -Force "$AgentDir\nssm-tmp", $NssmZip
-}
+Register-ScheduledTask -TaskName $TaskName -Action $Action -Trigger $Trigger `
+    -Settings $Settings -Principal $Principal -Description "Jenkins JNLP agent connecting to $JenkinsUrl" | Out-Null
 
-& $NssmPath install $ServiceName java
-& $NssmPath set $ServiceName AppParameters "-jar `"$AgentJar`" -url `"$JenkinsUrl`" -name `"$AgentName`" -secret `"$Secret`" -workDir `"$AgentDir`" -webSocket"
-& $NssmPath set $ServiceName AppDirectory $AgentDir
-& $NssmPath set $ServiceName DisplayName "Jenkins Agent ($AgentName)"
-& $NssmPath set $ServiceName Description "Jenkins JNLP agent connecting to $JenkinsUrl"
-& $NssmPath set $ServiceName Start SERVICE_AUTO_START
-& $NssmPath set $ServiceName AppStdout "$AgentDir\agent.log"
-& $NssmPath set $ServiceName AppStderr "$AgentDir\agent.log"
-& $NssmPath set $ServiceName AppRotateFiles 1
-& $NssmPath set $ServiceName AppRotateBytes 10485760
+# ── Start the task now ────────────────────────
+Start-ScheduledTask -TaskName $TaskName
+Start-Sleep -Seconds 5
 
-# ── Start service ─────────────────────────────
-Start-Service -Name $ServiceName
-
+# ── Verify ────────────────────────────────────
+$task = Get-ScheduledTask -TaskName $TaskName
 Write-Host ""
-Write-Host "Jenkins JNLP agent installed as Windows service."
-Write-Host "  Service: $ServiceName"
+Write-Host "Jenkins JNLP agent installed as Scheduled Task."
+Write-Host "  Task: $TaskName (Status: $($task.State))"
 Write-Host "  Work dir: $AgentDir"
-Write-Host "  Log: $AgentDir\agent.log"
+Write-Host "  Log: $AgentDir\agent.log (if configured)"
 Write-Host ""
 Write-Host "Commands:"
-Write-Host "  Status:  Get-Service $ServiceName"
-Write-Host "  Stop:    Stop-Service $ServiceName"
-Write-Host "  Start:   Start-Service $ServiceName"
-Write-Host "  Remove:  & `"$NssmPath`" remove $ServiceName confirm"
+Write-Host "  Status:  Get-ScheduledTask -TaskName $TaskName"
+Write-Host "  Stop:    Stop-ScheduledTask -TaskName $TaskName"
+Write-Host "  Start:   Start-ScheduledTask -TaskName $TaskName"
+Write-Host "  Remove:  Unregister-ScheduledTask -TaskName $TaskName -Confirm:`$false"
 Write-Host "  Logs:    Get-Content $AgentDir\agent.log -Tail 50"
