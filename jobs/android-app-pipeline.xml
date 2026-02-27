@@ -1,4 +1,5 @@
-<?xml version="1.1" encoding="UTF-8"?><flow-definition plugin="workflow-job@1571.vb_423c255d6d9">
+<?xml version='1.1' encoding='UTF-8'?>
+<flow-definition plugin="workflow-job@1571.vb_423c255d6d9">
   <actions>
     <org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobAction plugin="pipeline-model-definition@2.2277.v00573e73ddf1"/>
     <org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobPropertyTrackerAction plugin="pipeline-model-definition@2.2277.v00573e73ddf1">
@@ -6,7 +7,9 @@
         <string>org.jenkinsci.plugins.workflow.job.properties.DisableConcurrentBuildsJobProperty</string>
         <string>jenkins.model.BuildDiscarderProperty</string>
       </jobProperties>
-      <triggers/>
+      <triggers>
+        <string>hudson.triggers.SCMTrigger</string>
+      </triggers>
       <parameters/>
       <options/>
     </org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobPropertyTrackerAction>
@@ -25,69 +28,85 @@
     <org.jenkinsci.plugins.workflow.job.properties.DisableConcurrentBuildsJobProperty>
       <abortPrevious>false</abortPrevious>
     </org.jenkinsci.plugins.workflow.job.properties.DisableConcurrentBuildsJobProperty>
+    <org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty>
+      <triggers>
+        <hudson.triggers.SCMTrigger>
+          <spec>H/5 * * * *</spec>
+          <ignorePostCommitHooks>false</ignorePostCommitHooks>
+        </hudson.triggers.SCMTrigger>
+      </triggers>
+    </org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty>
   </properties>
-  <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@4256.v991a_f1991c03">
+  <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@4257.vb_2e202808577">
     <script>pipeline {
     agent any
+    triggers {
+        pollSCM(&apos;H/5 * * * *&apos;)
+    }
     environment {
-        PROJECT_NAME = "android-app"
-        PROJECT_DIR  = "${env.PROJECTS_DIR}/arcana-android"
+        PROJECT_NAME = &quot;android-app&quot;
+        PROJECT_DIR  = &quot;${env.PROJECTS_DIR}/arcana-android&quot;
     }
     options {
-        timeout(time: 60, unit: "MINUTES")
+        timeout(time: 90, unit: &quot;MINUTES&quot;)
         disableConcurrentBuilds()
-        buildDiscarder(logRotator(numToKeepStr: "10"))
+        buildDiscarder(logRotator(numToKeepStr: &quot;10&quot;))
     }
     stages {
-        stage("Checkout") {
-            steps { echo "Using cloned repo: arcana-android" }
-        }
-        stage("Docker Compose Build") {
+        stage(&quot;Checkout&quot;) {
             steps {
-                dir("${PROJECT_DIR}") {
-                    sh "docker compose -f docker-compose.ci.yml build"
+                dir(&quot;${env.PROJECTS_DIR}/arcana-android&quot;) {
+                    git url: &apos;https://github.com/jrjohn/arcana-android.git&apos;,
+                        branch: &apos;main&apos;, credentialsId: &apos;github-credentials&apos;
                 }
             }
         }
-        stage("Gradle Build") {
+        stage(&quot;Docker Compose Build&quot;) {
             steps {
-                dir("${PROJECT_DIR}") {
-                    sh "docker compose -f docker-compose.ci.yml run --rm android-build"
+                dir(&quot;${PROJECT_DIR}&quot;) {
+                    sh &quot;docker compose -f docker-compose.ci.yml build&quot;
                 }
             }
         }
-        stage("SonarQube Analysis") {
+        stage(&quot;Gradle Build&quot;) {
             steps {
-                dir("${PROJECT_DIR}") {
-                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                        withSonarQubeEnv('SonarQube') {
-                            sh '''sonar-scanner \
+                dir(&quot;${PROJECT_DIR}&quot;) {
+                    sh &quot;docker compose -f docker-compose.ci.yml run --rm android-build&quot;
+                }
+            }
+        }
+        stage(&quot;SonarQube Analysis&quot;) {
+            steps {
+                dir(&quot;${PROJECT_DIR}&quot;) {
+                    catchError(buildResult: &apos;SUCCESS&apos;, stageResult: &apos;UNSTABLE&apos;) {
+                        withSonarQubeEnv(&apos;SonarQube&apos;) {
+                            sh &apos;&apos;&apos;sonar-scanner \
                               -Dsonar.projectKey=android-app \
-                              -Dsonar.projectName="Android App" \
+                              -Dsonar.projectName=&quot;Android App&quot; \
                               -Dsonar.sources=. \
                               -Dsonar.exclusions=**/build/**,**/.gradle/**,**/docs/**,**/*.java,**/*.kt \
                               -Dsonar.java.binaries=. \
                               -Dsonar.scm.disabled=true \
-                              -Dsonar.coverage.jacoco.xmlReportPaths='''
+                              -Dsonar.coverage.jacoco.xmlReportPaths=&apos;&apos;&apos;
                         }
                     }
                 }
             }
         }
-        stage("Verify APK") {
+        stage(&quot;Verify APK&quot;) {
             steps {
-                dir("${PROJECT_DIR}") {
-                    sh "ls -la app/build/outputs/apk/debug/ || echo 'APK directory not found'"
+                dir(&quot;${PROJECT_DIR}&quot;) {
+                    sh &quot;ls -la app/build/outputs/apk/debug/ || echo &apos;APK directory not found&apos;&quot;
                 }
             }
         }
     }
     post {
-        success { echo "Android build succeeded: ${PROJECT_NAME}" }
-        failure { echo "Android build FAILED: ${PROJECT_NAME}" }
+        success { echo &quot;Android build succeeded: ${PROJECT_NAME}&quot; }
+        failure { echo &quot;Android build FAILED: ${PROJECT_NAME}&quot; }
         always {
-            dir("${PROJECT_DIR}") {
-                sh "docker compose -f docker-compose.ci.yml down --remove-orphans || true"
+            dir(&quot;${PROJECT_DIR}&quot;) {
+                sh &quot;docker compose -f docker-compose.ci.yml down --remove-orphans || true&quot;
             }
         }
     }

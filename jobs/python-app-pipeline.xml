@@ -3,17 +3,31 @@
     <org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobAction plugin="pipeline-model-definition@2.2277.v00573e73ddf1"/>
     <org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobPropertyTrackerAction plugin="pipeline-model-definition@2.2277.v00573e73ddf1">
       <jobProperties/>
-      <triggers/>
+      <triggers>
+        <string>hudson.triggers.SCMTrigger</string>
+      </triggers>
       <parameters/>
       <options/>
     </org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobPropertyTrackerAction>
   </actions>
   <description>Python Pipeline (compose)</description>
   <keepDependencies>false</keepDependencies>
-  <properties/>
-  <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@4256.v991a_f1991c03">
+  <properties>
+    <org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty>
+      <triggers>
+        <hudson.triggers.SCMTrigger>
+          <spec>H/5 * * * *</spec>
+          <ignorePostCommitHooks>false</ignorePostCommitHooks>
+        </hudson.triggers.SCMTrigger>
+      </triggers>
+    </org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty>
+  </properties>
+  <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@4257.vb_2e202808577">
     <script>pipeline {
     agent any
+    triggers {
+        pollSCM('H/5 * * * *')
+    }
     environment {
         APP_NAME  = "python-app"
         REGISTRY  = "localhost:5000"
@@ -23,7 +37,10 @@
     stages {
         stage("Checkout") {
             steps {
-                echo "Using cloned repo: arcana-cloud-python"
+                dir("${env.PROJECTS_DIR}/arcana-cloud-python") {
+                    git url: 'https://github.com/jrjohn/arcana-cloud-python.git',
+                        branch: 'main', credentialsId: 'github-credentials'
+                }
             }
         }
         stage("Docker Compose Build") {
@@ -52,10 +69,9 @@
                               -Dsonar.projectKey=python-app \
                               -Dsonar.projectName="Python App" \
                               -Dsonar.sources=. \
-                              -Dsonar.exclusions=venv/**,**/__pycache__/** \
+                              -Dsonar.exclusions=venv/**,**/__pycache__/**,tests/**,**/*_pb2*.py,docs/**,**/grpc_protos/** \
                               -Dsonar.python.version=3.12 \
-                              -Dsonar.scm.disabled=true \
-                              -Dsonar.python.coverage.reportPaths=coverage/coverage.xml'''
+                              -Dsonar.scm.disabled=true'''
                         }
                     }
                 }

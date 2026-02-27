@@ -1,81 +1,99 @@
-<?xml version="1.1" encoding="UTF-8"?><flow-definition plugin="workflow-job@1571.vb_423c255d6d9">
+<?xml version='1.1' encoding='UTF-8'?>
+<flow-definition plugin="workflow-job@1571.vb_423c255d6d9">
   <actions>
     <org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobAction plugin="pipeline-model-definition@2.2277.v00573e73ddf1"/>
     <org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobPropertyTrackerAction plugin="pipeline-model-definition@2.2277.v00573e73ddf1">
       <jobProperties/>
-      <triggers/>
+      <triggers>
+        <string>hudson.triggers.SCMTrigger</string>
+      </triggers>
       <parameters/>
       <options/>
     </org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobPropertyTrackerAction>
   </actions>
   <description>Rust Pipeline (compose)</description>
   <keepDependencies>false</keepDependencies>
-  <properties/>
-  <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@4256.v991a_f1991c03">
+  <properties>
+    <org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty>
+      <triggers>
+        <hudson.triggers.SCMTrigger>
+          <spec>H/5 * * * *</spec>
+          <ignorePostCommitHooks>false</ignorePostCommitHooks>
+        </hudson.triggers.SCMTrigger>
+      </triggers>
+    </org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty>
+  </properties>
+  <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@4257.vb_2e202808577">
     <script>pipeline {
     agent any
+    triggers {
+        pollSCM(&apos;H/5 * * * *&apos;)
+    }
     environment {
-        APP_NAME  = "rust-app"
-        REGISTRY  = "localhost:5000"
-        IMAGE_TAG = "${REGISTRY}/arcana/${APP_NAME}"
-        VERSION   = "1.0.0"
+        APP_NAME  = &quot;rust-app&quot;
+        REGISTRY  = &quot;localhost:5000&quot;
+        IMAGE_TAG = &quot;${REGISTRY}/arcana/${APP_NAME}&quot;
+        VERSION   = &quot;1.0.0&quot;
     }
     stages {
-        stage("Checkout") {
+        stage(&quot;Checkout&quot;) {
             steps {
-                echo "Using cloned repo: arcana-cloud-rust"
-            }
-        }
-        stage("Docker Compose Build") {
-            steps {
-                dir("${env.PROJECTS_DIR}/arcana-cloud-rust") {
-                    sh "VERSION=${VERSION} docker compose -f docker-compose.ci.yml build"
-                    sh "docker tag localhost:5000/arcana/${APP_NAME}:${VERSION} ${IMAGE_TAG}:build-${BUILD_NUMBER}"
+                dir(&quot;${env.PROJECTS_DIR}/arcana-cloud-rust&quot;) {
+                    git url: &apos;https://github.com/jrjohn/arcana-cloud-rust.git&apos;,
+                        branch: &apos;main&apos;, credentialsId: &apos;github-credentials&apos;
                 }
             }
         }
-        stage("Unit Tests") {
+        stage(&quot;Docker Compose Build&quot;) {
             steps {
-                dir("${env.PROJECTS_DIR}/arcana-cloud-rust") {
-                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                        sh "docker compose -f docker-compose.test.yml run --rm --build test"
+                dir(&quot;${env.PROJECTS_DIR}/arcana-cloud-rust&quot;) {
+                    sh &quot;VERSION=${VERSION} docker compose -f docker-compose.ci.yml build&quot;
+                    sh &quot;docker tag localhost:5000/arcana/${APP_NAME}:${VERSION} ${IMAGE_TAG}:build-${BUILD_NUMBER}&quot;
+                }
+            }
+        }
+        stage(&quot;Unit Tests&quot;) {
+            steps {
+                dir(&quot;${env.PROJECTS_DIR}/arcana-cloud-rust&quot;) {
+                    catchError(buildResult: &apos;SUCCESS&apos;, stageResult: &apos;UNSTABLE&apos;) {
+                        sh &quot;docker compose -f docker-compose.test.yml run --rm --build test&quot;
                     }
                 }
             }
         }
-        stage("SonarQube Analysis") {
+        stage(&quot;SonarQube Analysis&quot;) {
             steps {
-                dir("${env.PROJECTS_DIR}/arcana-cloud-rust") {
-                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                        withSonarQubeEnv('SonarQube') {
-                            sh '''sonar-scanner \
+                dir(&quot;${env.PROJECTS_DIR}/arcana-cloud-rust&quot;) {
+                    catchError(buildResult: &apos;SUCCESS&apos;, stageResult: &apos;UNSTABLE&apos;) {
+                        withSonarQubeEnv(&apos;SonarQube&apos;) {
+                            sh &apos;&apos;&apos;sonar-scanner \
                               -Dsonar.projectKey=rust-app \
-                              -Dsonar.projectName="Rust App" \
+                              -Dsonar.projectName=&quot;Rust App&quot; \
                               -Dsonar.sources=crates \
                               -Dsonar.exclusions=target/**,**/target/** \
                               -Dsonar.rust.clippy.enabled=false \
-                              -Dsonar.scm.disabled=true'''
+                              -Dsonar.scm.disabled=true&apos;&apos;&apos;
                         }
                     }
                 }
             }
         }
-        stage("Image Info") {
+        stage(&quot;Image Info&quot;) {
             steps {
-                sh "docker images --format 'table {{.Repository}}:{{.Tag}}\t{{.Size}}' ${IMAGE_TAG}:${VERSION}"
+                sh &quot;docker images --format &apos;table {{.Repository}}:{{.Tag}}\t{{.Size}}&apos; ${IMAGE_TAG}:${VERSION}&quot;
             }
         }
-        stage("Push to Registry") {
+        stage(&quot;Push to Registry&quot;) {
             steps {
-                sh "docker push ${IMAGE_TAG}:${VERSION}"
-                sh "docker push ${IMAGE_TAG}:build-${BUILD_NUMBER}"
+                sh &quot;docker push ${IMAGE_TAG}:${VERSION}&quot;
+                sh &quot;docker push ${IMAGE_TAG}:build-${BUILD_NUMBER}&quot;
             }
         }
     }
     post {
-        success { echo "Pipeline SUCCESS - ${APP_NAME}:${VERSION}" }
-        failure { echo "Pipeline FAILED" }
-        always  { echo "Build number ${BUILD_NUMBER} done" }
+        success { echo &quot;Pipeline SUCCESS - ${APP_NAME}:${VERSION}&quot; }
+        failure { echo &quot;Pipeline FAILED&quot; }
+        always  { echo &quot;Build number ${BUILD_NUMBER} done&quot; }
     }
 }
 

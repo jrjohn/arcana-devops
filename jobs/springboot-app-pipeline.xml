@@ -3,17 +3,31 @@
     <org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobAction plugin="pipeline-model-definition@2.2277.v00573e73ddf1"/>
     <org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobPropertyTrackerAction plugin="pipeline-model-definition@2.2277.v00573e73ddf1">
       <jobProperties/>
-      <triggers/>
+      <triggers>
+        <string>hudson.triggers.SCMTrigger</string>
+      </triggers>
       <parameters/>
       <options/>
     </org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobPropertyTrackerAction>
   </actions>
   <description>Spring Boot Pipeline (compose)</description>
   <keepDependencies>false</keepDependencies>
-  <properties/>
-  <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@4256.v991a_f1991c03">
+  <properties>
+    <org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty>
+      <triggers>
+        <hudson.triggers.SCMTrigger>
+          <spec>H/5 * * * *</spec>
+          <ignorePostCommitHooks>false</ignorePostCommitHooks>
+        </hudson.triggers.SCMTrigger>
+      </triggers>
+    </org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty>
+  </properties>
+  <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@4257.vb_2e202808577">
     <script>pipeline {
     agent any
+    triggers {
+        pollSCM('H/5 * * * *')
+    }
     environment {
         APP_NAME  = "springboot-app"
         REGISTRY  = "localhost:5000"
@@ -23,7 +37,10 @@
     stages {
         stage("Checkout") {
             steps {
-                echo "Using cloned repo: arcana-cloud-springboot"
+                dir("${env.PROJECTS_DIR}/arcana-cloud-springboot") {
+                    git url: 'https://github.com/jrjohn/arcana-cloud-springboot.git',
+                        branch: 'main', credentialsId: 'github-credentials'
+                }
             }
         }
         stage("Docker Compose Build") {
@@ -51,11 +68,11 @@
                             sh '''sonar-scanner \
                               -Dsonar.projectKey=springboot-app \
                               -Dsonar.projectName="Spring Boot App" \
-                              -Dsonar.sources=. \
-                              -Dsonar.exclusions=**/build/**,**/target/**,**/.gradle/**,**/docs/**,**/*.java \
-                              -Dsonar.java.binaries=. \
-                              -Dsonar.scm.disabled=true \
-                              -Dsonar.coverage.jacoco.xmlReportPaths=build/reports/jacoco/test/jacocoTestReport.xml'''
+                              -Dsonar.sources=src/main \
+                              -Dsonar.tests=src/test \
+                              -Dsonar.exclusions=**/build/**,**/target/**,**/.gradle/**,**/docs/**,scripts/** \
+                              -Dsonar.java.binaries=src/main/java \
+                              -Dsonar.scm.disabled=true'''
                         }
                     }
                 }

@@ -1,73 +1,91 @@
-<?xml version="1.1" encoding="UTF-8"?><flow-definition plugin="workflow-job@1571.vb_423c255d6d9">
+<?xml version='1.1' encoding='UTF-8'?>
+<flow-definition plugin="workflow-job@1571.vb_423c255d6d9">
   <actions>
     <org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobAction plugin="pipeline-model-definition@2.2277.v00573e73ddf1"/>
     <org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobPropertyTrackerAction plugin="pipeline-model-definition@2.2277.v00573e73ddf1">
       <jobProperties/>
-      <triggers/>
+      <triggers>
+        <string>hudson.triggers.SCMTrigger</string>
+      </triggers>
       <parameters/>
       <options/>
     </org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobPropertyTrackerAction>
   </actions>
   <description>Go Pipeline (compose)</description>
   <keepDependencies>false</keepDependencies>
-  <properties/>
-  <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@4256.v991a_f1991c03">
+  <properties>
+    <org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty>
+      <triggers>
+        <hudson.triggers.SCMTrigger>
+          <spec>H/5 * * * *</spec>
+          <ignorePostCommitHooks>false</ignorePostCommitHooks>
+        </hudson.triggers.SCMTrigger>
+      </triggers>
+    </org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty>
+  </properties>
+  <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@4257.vb_2e202808577">
     <script>pipeline {
     agent any
+    triggers {
+        pollSCM(&apos;H/5 * * * *&apos;)
+    }
     environment {
-        APP_NAME  = "go-app"
-        REGISTRY  = "localhost:5000"
-        IMAGE_TAG = "${REGISTRY}/arcana/${APP_NAME}"
-        VERSION   = "1.0.0"
+        APP_NAME  = &quot;go-app&quot;
+        REGISTRY  = &quot;localhost:5000&quot;
+        IMAGE_TAG = &quot;${REGISTRY}/arcana/${APP_NAME}&quot;
+        VERSION   = &quot;1.0.0&quot;
     }
     stages {
-        stage("Checkout") {
+        stage(&quot;Checkout&quot;) {
             steps {
-                echo "Using sample go-app from starter kit"
-            }
-        }
-        stage("Docker Compose Build") {
-            steps {
-                dir("/var/jenkins_home/samples/go-app") {
-                    sh "VERSION=${VERSION} DOCKER_REGISTRY=${REGISTRY} docker compose -f docker-compose.ci.yml build"
-                    sh "docker tag ${IMAGE_TAG}:${VERSION} ${IMAGE_TAG}:build-${BUILD_NUMBER}"
+                dir(&quot;${env.PROJECTS_DIR}/arcana-cloud-go&quot;) {
+                    git url: &apos;https://github.com/jrjohn/arcana-cloud-go.git&apos;,
+                        branch: &apos;main&apos;, credentialsId: &apos;github-credentials&apos;
                 }
             }
         }
-        stage("SonarQube Analysis") {
+        stage(&quot;Docker Compose Build&quot;) {
             steps {
-                dir("/var/jenkins_home/samples/go-app") {
-                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                        withSonarQubeEnv('SonarQube') {
-                            sh '''sonar-scanner \
+                dir(&quot;${env.PROJECTS_DIR}/arcana-cloud-go&quot;) {
+                    sh &quot;VERSION=${VERSION} DOCKER_REGISTRY=${REGISTRY} docker compose -f docker-compose.ci.yml build&quot;
+                    sh &quot;docker tag ${IMAGE_TAG}:${VERSION} ${IMAGE_TAG}:build-${BUILD_NUMBER}&quot;
+                }
+            }
+        }
+        stage(&quot;SonarQube Analysis&quot;) {
+            steps {
+                dir(&quot;${env.PROJECTS_DIR}/arcana-cloud-go&quot;) {
+                    catchError(buildResult: &apos;SUCCESS&apos;, stageResult: &apos;UNSTABLE&apos;) {
+                        withSonarQubeEnv(&apos;SonarQube&apos;) {
+                            sh &apos;&apos;&apos;sonar-scanner \
                               -Dsonar.projectKey=go-app \
-                              -Dsonar.projectName="Go App" \
+                              -Dsonar.projectName=&quot;Go App&quot; \
                               -Dsonar.sources=. \
                               -Dsonar.exclusions=vendor/**,*_test.go \
                               -Dsonar.text.inclusions.activate=false \
                               -Dsonar.scm.disabled=true \
-                              -Dsonar.coverage.jacoco.xmlReportPaths='''
+                              -Dsonar.coverage.jacoco.xmlReportPaths=&apos;&apos;&apos;
                         }
                     }
                 }
             }
         }
-        stage("Image Info") {
+        stage(&quot;Image Info&quot;) {
             steps {
-                sh "docker images --format 'table {{.Repository}}:{{.Tag}}\t{{.Size}}' ${IMAGE_TAG}:${VERSION}"
+                sh &quot;docker images --format &apos;table {{.Repository}}:{{.Tag}}\t{{.Size}}&apos; ${IMAGE_TAG}:${VERSION}&quot;
             }
         }
-        stage("Push to Registry") {
+        stage(&quot;Push to Registry&quot;) {
             steps {
-                sh "docker push ${IMAGE_TAG}:${VERSION}"
-                sh "docker push ${IMAGE_TAG}:build-${BUILD_NUMBER}"
+                sh &quot;docker push ${IMAGE_TAG}:${VERSION}&quot;
+                sh &quot;docker push ${IMAGE_TAG}:build-${BUILD_NUMBER}&quot;
             }
         }
     }
     post {
-        success { echo "Pipeline SUCCESS - ${APP_NAME}:${VERSION}" }
-        failure { echo "Pipeline FAILED" }
-        always  { echo "Build number ${BUILD_NUMBER} done" }
+        success { echo &quot;Pipeline SUCCESS - ${APP_NAME}:${VERSION}&quot; }
+        failure { echo &quot;Pipeline FAILED&quot; }
+        always  { echo &quot;Build number ${BUILD_NUMBER} done&quot; }
     }
 }
 
