@@ -72,6 +72,9 @@
                               -Dsonar.tests=src/test \
                               -Dsonar.exclusions=**/build/**,**/target/**,**/.gradle/**,**/docs/**,scripts/** \
                               -Dsonar.java.binaries=src/main/java \
+                              -Dsonar.coverage.jacoco.xmlReportPaths=build/reports/jacoco/test/jacocoTestReport.xml \
+                              -Dsonar.coverage.exclusions=src/main/java/com/arcana/cloud/repository/impl/**,src/main/java/com/arcana/cloud/dao/impl/**,src/main/java/com/arcana/cloud/service/client/**,src/main/java/com/arcana/cloud/service/grpc/**,src/main/java/com/arcana/cloud/config/**,src/main/java/com/arcana/cloud/scheduler/**,src/main/resources/**/*.js \
+                              -Dsonar.cpd.exclusions=src/main/java/com/arcana/cloud/repository/impl/**,src/main/java/com/arcana/cloud/dao/impl/** \
                               -Dsonar.scm.disabled=true'''
                         }
                     }

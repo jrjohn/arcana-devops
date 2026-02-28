@@ -69,8 +69,10 @@
                               -Dsonar.projectKey=python-app \
                               -Dsonar.projectName="Python App" \
                               -Dsonar.sources=. \
-                              -Dsonar.exclusions=venv/**,**/__pycache__/**,tests/**,**/*_pb2*.py,docs/**,**/grpc_protos/** \
+                              -Dsonar.exclusions=venv/**,**/__pycache__/**,tests/**,**/*_pb2*.py,docs/**,**/grpc_protos/**,scripts/**,tools/** \
                               -Dsonar.python.version=3.12 \
+                              -Dsonar.python.coverage.reportPaths=coverage/coverage.xml \
+                              -Dsonar.coverage.exclusions=app/repository/**,app/dao/**,app/di_container.py,app/repositories/clients/**,app/repositories/routes/** \
                               -Dsonar.scm.disabled=true'''
                         }
                     }
