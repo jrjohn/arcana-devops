@@ -42,7 +42,7 @@ services:
     restart: unless-stopped
 
   sonarqube:
-    image: sonarqube:lts-community
+    image: sonarqube:26.2.0.119303-community
     container_name: sonarqube
     ports:
       - "9000:9000"
