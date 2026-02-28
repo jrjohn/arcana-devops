@@ -83,30 +83,9 @@ services:
       - registry_data:/var/lib/registry
     restart: unless-stopped
 
-  mysql:
-    image: mysql:8.0
-    container_name: mysql
-    restart: unless-stopped
-    environment:
-      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-5YzYziFT3g}"
-      MYSQL_DATABASE: english
-      MYSQL_USER: jrjohn
-      MYSQL_PASSWORD: "${MYSQL_PASSWORD:-2A4c6H4fC8}"
-      TZ: Asia/Taipei
-    volumes:
-      - /data/mysql/data:/var/lib/mysql
-      - /data/mysql/conf/my.cnf:/etc/mysql/conf.d/my.cnf:ro
-      - /data/mysql/logs:/var/log/mysql
-      - ./mysql-init:/docker-entrypoint-initdb.d:ro
-    command:
-      - --default-authentication-plugin=caching_sha2_password
-    ports:
-      - "3306:3306"
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+  # NOTE: MySQL is managed separately (see your mysql docker-compose).
+  # It joins devops_default via: networks: [devops_default] + external: true
+  # Accessible from Jenkins as: mysql:3306
 
 volumes:
   jenkins_home:
