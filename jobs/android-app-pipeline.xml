@@ -61,6 +61,25 @@
                 }
             }
         }
+                stage(&quot;Cleanup Old Images&quot;) {
+            steps {
+                dir(&quot;${env.PROJECTS_DIR}/arcana-android&quot;) {
+                    sh '''
+                        # Remove dangling/unused images to free disk space
+                        docker image prune -f || true
+                        # Keep only last 3 build-tagged images for this app
+                        docker images --format &apos;{{.Repository}}:{{.Tag}}&apos; \
+                            | grep &quot;${APP_NAME}.*build-&quot; \
+                            | sort -t- -k2 -rn \
+                            | tail -n +4 \
+                            | xargs -r docker rmi 2>/dev/null || true
+                        # Stop leftover test containers
+                        docker compose -f docker-compose.test.yml down \
+                            --remove-orphans 2>/dev/null || true
+                    '''
+                }
+            }
+        }
         stage(&quot;Docker Compose Build&quot;) {
             steps {
                 dir(&quot;${PROJECT_DIR}&quot;) {

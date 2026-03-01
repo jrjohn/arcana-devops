@@ -43,6 +43,25 @@
                 }
             }
         }
+                stage("Cleanup Old Images") {
+            steps {
+                dir("${env.PROJECTS_DIR}/arcana-cloud-nodejs") {
+                    sh '''
+                        # Remove dangling/unused images to free disk space
+                        docker image prune -f || true
+                        # Keep only last 3 build-tagged images for this app
+                        docker images --format '{{.Repository}}:{{.Tag}}' \
+                            | grep "${APP_NAME}.*build-" \
+                            | sort -t- -k2 -rn \
+                            | tail -n +4 \
+                            | xargs -r docker rmi 2>/dev/null || true
+                        # Stop leftover test containers
+                        docker compose -f docker-compose.test.yml down \
+                            --remove-orphans 2>/dev/null || true
+                    '''
+                }
+            }
+        }
         stage("Docker Compose Build") {
             steps {
                 dir("${env.PROJECTS_DIR}/arcana-cloud-nodejs") {
