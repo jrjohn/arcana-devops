@@ -1,49 +1,119 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Set up Jenkins JNLP agent on Mac Mini as a launchd service
-# Connects outbound to https://arcana.boo/jenkins/ via WebSocket
+# Set up Jenkins JNLP agent on Mac Mini with SSH tunnel + health check
+# Uses autossh tunnel to Jenkins (bypasses nginx/Authelia for stability)
 #
 # Prerequisites:
 #   - Java 17+ installed (brew install openjdk@17)
-#   - Jenkins agent.jar downloaded
+#   - SSH key configured for Jenkins server (e.g. rocky@161.118.206.170)
+#   - autossh installed (brew install autossh)
 #
-# Usage: ./setup-jnlp-agent-mac.sh <agent-secret>
-#   Get the secret from: Jenkins → Manage Jenkins → Nodes → macmini
+# Usage: ./setup-jnlp-agent-mac.sh <agent-secret> <ssh-target>
+#   agent-secret: Get from Jenkins → Manage Jenkins → Nodes → macmini
+#   ssh-target:   SSH destination, e.g. rocky@161.118.206.170
 
-JENKINS_URL="https://arcana.boo/jenkins/"
 AGENT_NAME="macmini"
 AGENT_DIR="$HOME/jenkins-agent"
 AGENT_JAR="$AGENT_DIR/agent.jar"
-PLIST_NAME="com.jenkins.agent"
-PLIST_PATH="$HOME/Library/LaunchAgents/$PLIST_NAME.plist"
+TUNNEL_LOCAL_PORT=18080
+JENKINS_REMOTE_PORT=8080
+JENKINS_URL="http://localhost:${TUNNEL_LOCAL_PORT}/jenkins/"
+DOWNLOAD_URL="https://arcana.boo/jenkins/"
 
-if [ $# -lt 1 ]; then
-    echo "Usage: $0 <agent-secret>"
+if [ $# -lt 2 ]; then
+    echo "Usage: $0 <agent-secret> <ssh-target>"
     echo ""
-    echo "Get the secret from Jenkins → Manage Jenkins → Nodes → macmini"
+    echo "  agent-secret: Get from Jenkins → Manage Jenkins → Nodes → macmini"
+    echo "  ssh-target:   e.g. rocky@161.118.206.170"
     exit 1
 fi
 
 AGENT_SECRET="$1"
+SSH_TARGET="$2"
+
+# ── Validate prerequisites ────────────────────
+echo "Checking prerequisites..."
+which java >/dev/null 2>&1 || { echo "ERROR: Java not found. Install with: brew install openjdk@17"; exit 1; }
+which autossh >/dev/null 2>&1 || { echo "ERROR: autossh not found. Install with: brew install autossh"; exit 1; }
+
+SSH_KEY="$HOME/.ssh/id_ed25519"
+[ -f "$SSH_KEY" ] || SSH_KEY="$HOME/.ssh/id_rsa"
+[ -f "$SSH_KEY" ] || { echo "ERROR: No SSH key found at ~/.ssh/id_ed25519 or ~/.ssh/id_rsa"; exit 1; }
+
+# Test SSH connection
+echo "Testing SSH connection to $SSH_TARGET..."
+ssh -i "$SSH_KEY" -o ConnectTimeout=10 -o BatchMode=yes "$SSH_TARGET" "echo OK" >/dev/null 2>&1 \
+    || { echo "ERROR: Cannot SSH to $SSH_TARGET. Check your SSH key and target."; exit 1; }
 
 # ── Setup ─────────────────────────────────────
-echo "Setting up Jenkins JNLP agent..."
-
+echo "Setting up Jenkins JNLP agent with SSH tunnel..."
 mkdir -p "$AGENT_DIR"
 
 # Download agent.jar
 echo "Downloading agent.jar..."
-curl -sL "${JENKINS_URL}jnlpJars/agent.jar" -o "$AGENT_JAR"
+curl -sL "${DOWNLOAD_URL}jnlpJars/agent.jar" -o "$AGENT_JAR"
 
-# ── Create launchd plist ──────────────────────
-cat > "$PLIST_PATH" << EOF
+# ── Optimize power management ─────────────────
+echo "Optimizing power management for CI agent..."
+sudo pmset -a sleep 0 displaysleep 0 disksleep 0 powernap 0 \
+    networkoversleep 1 womp 1 tcpkeepalive 1 2>/dev/null || true
+
+# ── 1. SSH Tunnel (autossh) ───────────────────
+TUNNEL_PLIST="$HOME/Library/LaunchAgents/com.jenkins.tunnel.plist"
+cat > "$TUNNEL_PLIST" << EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>$PLIST_NAME</string>
+    <string>com.jenkins.tunnel</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>AUTOSSH_GATETIME</key>
+        <string>0</string>
+    </dict>
+    <key>ProgramArguments</key>
+    <array>
+        <string>$(which autossh)</string>
+        <string>-M</string>
+        <string>0</string>
+        <string>-N</string>
+        <string>-o</string>
+        <string>ServerAliveInterval=30</string>
+        <string>-o</string>
+        <string>ServerAliveCountMax=3</string>
+        <string>-o</string>
+        <string>ExitOnForwardFailure=yes</string>
+        <string>-o</string>
+        <string>StrictHostKeyChecking=no</string>
+        <string>-i</string>
+        <string>$SSH_KEY</string>
+        <string>-L</string>
+        <string>${TUNNEL_LOCAL_PORT}:localhost:${JENKINS_REMOTE_PORT}</string>
+        <string>$SSH_TARGET</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>$AGENT_DIR/tunnel.log</string>
+    <key>StandardErrorPath</key>
+    <string>$AGENT_DIR/tunnel.log</string>
+</dict>
+</plist>
+EOF
+
+# ── 2. Jenkins Agent ──────────────────────────
+AGENT_PLIST="$HOME/Library/LaunchAgents/com.jenkins.agent.plist"
+cat > "$AGENT_PLIST" << EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.jenkins.agent</string>
     <key>ProgramArguments</key>
     <array>
         <string>$(which java)</string>
@@ -76,18 +146,154 @@ cat > "$PLIST_PATH" << EOF
 </plist>
 EOF
 
-# ── Load service ──────────────────────────────
-launchctl unload "$PLIST_PATH" 2>/dev/null || true
-launchctl load -w "$PLIST_PATH"
+# ── 3. Health Check Daemon ────────────────────
+cat > "$AGENT_DIR/check-agent-daemon.sh" << 'HEALTHCHECK'
+#!/bin/bash
+# Jenkins agent health check daemon — detects silent WebSocket disconnects
+AGENT_DIR="$HOME/jenkins-agent"
+PLIST="$HOME/Library/LaunchAgents/com.jenkins.agent.plist"
+LOGFILE="${AGENT_DIR}/check-agent.log"
+REMOTING_LOG="${AGENT_DIR}/remoting/logs/remoting.log.0"
+FAIL_MARKER="${AGENT_DIR}/.failing_since"
+STALE_THRESHOLD=600  # 10 min without log update = silent disconnect
+FAIL_THRESHOLD=300   # 5 min of continuous failures = restart
+CHECK_INTERVAL=60    # check every 60s
+
+timestamp() { date '+%Y-%m-%d %H:%M:%S'; }
+
+restart_agent() {
+    local reason="$1"
+    echo "$(timestamp) RESTART: ${reason}" >> "$LOGFILE"
+    pkill -9 -f 'jenkins-agent/agent.jar' 2>/dev/null
+    sleep 2
+    launchctl unload "$PLIST" 2>/dev/null
+    sleep 1
+    launchctl load "$PLIST"
+    rm -f "$FAIL_MARKER"
+    echo "$(timestamp) Agent restarted." >> "$LOGFILE"
+}
+
+echo "$(timestamp) Health check daemon started (PID $$)" >> "$LOGFILE"
+
+while true; do
+    # Log rotation
+    if [ -f "$LOGFILE" ] && [ "$(wc -l < "$LOGFILE")" -gt 500 ]; then
+        tail -200 "$LOGFILE" > "${LOGFILE}.tmp" && mv "${LOGFILE}.tmp" "$LOGFILE"
+    fi
+
+    # 1. Process check
+    if ! pgrep -f 'jenkins-agent/agent.jar' > /dev/null 2>&1; then
+        restart_agent "process not running"
+        sleep "$CHECK_INTERVAL"
+        continue
+    fi
+
+    # 2. Remoting log check
+    if [ ! -f "$REMOTING_LOG" ]; then
+        sleep "$CHECK_INTERVAL"
+        continue
+    fi
+
+    LOG_MTIME=$(stat -f %m "$REMOTING_LOG" 2>/dev/null)
+    NOW=$(date +%s)
+    LOG_AGE=$(( NOW - LOG_MTIME ))
+
+    LAST_STATUS=$(grep -E '(Connected$|Failed to connect|Terminated|Waiting .* before retry)' "$REMOTING_LOG" | tail -1)
+
+    if echo "$LAST_STATUS" | grep -q 'Connected$'; then
+        if [ "$LOG_AGE" -gt "$STALE_THRESHOLD" ]; then
+            restart_agent "log stale for ${LOG_AGE}s (silent disconnect)"
+            sleep "$CHECK_INTERVAL"
+            continue
+        fi
+        rm -f "$FAIL_MARKER"
+        sleep "$CHECK_INTERVAL"
+        continue
+    fi
+
+    # 3. Failing state
+    if [ ! -f "$FAIL_MARKER" ]; then
+        date +%s > "$FAIL_MARKER"
+        echo "$(timestamp) Reconnecting..." >> "$LOGFILE"
+        sleep "$CHECK_INTERVAL"
+        continue
+    fi
+
+    FAIL_SINCE=$(cat "$FAIL_MARKER")
+    FAIL_DURATION=$(( NOW - FAIL_SINCE ))
+
+    if [ "$FAIL_DURATION" -gt "$FAIL_THRESHOLD" ]; then
+        restart_agent "stuck reconnecting for ${FAIL_DURATION}s"
+    fi
+
+    sleep "$CHECK_INTERVAL"
+done
+HEALTHCHECK
+chmod +x "$AGENT_DIR/check-agent-daemon.sh"
+
+CHECK_PLIST="$HOME/Library/LaunchAgents/com.jenkins.agent.check.plist"
+cat > "$CHECK_PLIST" << EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.jenkins.agent.check</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>$AGENT_DIR/check-agent-daemon.sh</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>$AGENT_DIR/check-agent-launchd.log</string>
+    <key>StandardErrorPath</key>
+    <string>$AGENT_DIR/check-agent-launchd.log</string>
+</dict>
+</plist>
+EOF
+
+# ── Load all services ─────────────────────────
+echo "Loading services..."
+
+# 1. Tunnel first
+launchctl unload "$TUNNEL_PLIST" 2>/dev/null || true
+launchctl load -w "$TUNNEL_PLIST"
+echo "  Waiting for tunnel..."
+for i in $(seq 1 10); do
+    if curl -s -m 2 -o /dev/null "http://localhost:${TUNNEL_LOCAL_PORT}/jenkins/login" 2>/dev/null; then
+        echo "  Tunnel ready."
+        break
+    fi
+    sleep 1
+done
+
+# 2. Agent
+launchctl unload "$AGENT_PLIST" 2>/dev/null || true
+launchctl load -w "$AGENT_PLIST"
+
+# 3. Health check daemon
+launchctl unload "$CHECK_PLIST" 2>/dev/null || true
+launchctl load -w "$CHECK_PLIST"
+
+sleep 3
 
 echo ""
-echo "Jenkins JNLP agent installed as launchd service."
-echo "  Service: $PLIST_NAME"
-echo "  Work dir: $AGENT_DIR"
-echo "  Log: $AGENT_DIR/agent.log"
+echo "Jenkins JNLP agent installed with SSH tunnel + health check."
+echo ""
+echo "  Services:"
+echo "    com.jenkins.tunnel       — autossh SSH tunnel (port $TUNNEL_LOCAL_PORT)"
+echo "    com.jenkins.agent        — Jenkins agent (via tunnel)"
+echo "    com.jenkins.agent.check  — Health check daemon (60s interval)"
+echo ""
+echo "  Logs:"
+echo "    $AGENT_DIR/tunnel.log"
+echo "    $AGENT_DIR/agent.log"
+echo "    $AGENT_DIR/check-agent.log"
 echo ""
 echo "Commands:"
 echo "  Status:  launchctl list | grep jenkins"
-echo "  Stop:    launchctl unload $PLIST_PATH"
-echo "  Start:   launchctl load -w $PLIST_PATH"
-echo "  Logs:    tail -f $AGENT_DIR/agent.log"
+echo "  Logs:    tail -f $AGENT_DIR/check-agent.log"

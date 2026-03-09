@@ -75,6 +75,13 @@
         }
     }
     post {
+        always {
+            sh '''
+                xcrun simctl shutdown all 2>/dev/null || true
+                xcrun simctl delete unavailable 2>/dev/null || true
+                rm -rf "${WORKSPACE}/DerivedData" 2>/dev/null || true
+            '''
+        }
         success { echo "iOS build succeeded: ${PROJECT_NAME} v${VERSION}" }
         failure { echo "iOS build FAILED: ${PROJECT_NAME}" }
     }

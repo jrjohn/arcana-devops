@@ -1,26 +1,21 @@
 #!/bin/bash
-# Docker Cleanup Script - runs when /data usage > 80%
-# Cron: 0 * * * * /data/devops/scripts/docker-cleanup.sh
+# Docker Cleanup Script — daily cleanup of images, registry, cache, volumes
+# Cron: 0 3 * * * /data/devops/scripts/docker-cleanup.sh
 LOG="/var/log/docker-cleanup.log"
-THRESHOLD=80
 REGISTRY="http://localhost:5000"
 ACCEPT="Accept: application/vnd.oci.image.index.v1+json"
 KEEP_BUILDS=3
 
-usage=$(df /data --output=pcent | tail -1 | tr -d " %")
-
-if [ "$usage" -le "$THRESHOLD" ]; then
-  exit 0
+# Log rotation (keep last 500 lines)
+if [ -f "$LOG" ] && [ "$(wc -l < "$LOG")" -gt 500 ]; then
+  tail -200 "$LOG" > "${LOG}.tmp" && mv "${LOG}.tmp" "$LOG"
 fi
 
-echo "=== $(date) === /data at ${usage}%, threshold ${THRESHOLD}% ===" >> "$LOG"
+usage=$(df /data --output=pcent | tail -1 | tr -d " %")
+echo "=== $(date) === /data at ${usage}% ===" >> "$LOG"
 
-# 1. Prune unused images
-echo "[1] Pruning unused images..." >> "$LOG"
-docker image prune -a -f >> "$LOG" 2>&1
-
-# 2. Clean old registry tags (keep version + latest N build tags)
-echo "[2] Cleaning old registry tags..." >> "$LOG"
+# 1. Clean old registry tags (keep version + latest N build tags)
+echo "[1] Cleaning old registry tags..." >> "$LOG"
 for repo in $(curl -s $REGISTRY/v2/_catalog | python3 -c "import sys,json; [print(r) for r in json.load(sys.stdin).get('repositories',[])]" 2>/dev/null); do
   tags=$(curl -s $REGISTRY/v2/$repo/tags/list | python3 -c "
 import sys, json
@@ -51,9 +46,13 @@ for t in (data.get('tags') or []):
   done
 done
 
-# 3. Registry garbage collection
-echo "[3] Registry garbage collection..." >> "$LOG"
-docker exec registry bin/registry garbage-collect /etc/docker/registry/config.yml >> "$LOG" 2>&1
+# 2. Registry garbage collection (remove unreferenced blobs)
+echo "[2] Registry garbage collection..." >> "$LOG"
+docker exec registry bin/registry garbage-collect /etc/docker/registry/config.yml --delete-untagged >> "$LOG" 2>&1
+
+# 3. Prune unused images (older than 24h to avoid deleting active builds)
+echo "[3] Pruning unused images..." >> "$LOG"
+docker image prune -a -f --filter 'until=24h' >> "$LOG" 2>&1
 
 # 4. Prune build cache
 echo "[4] Pruning build cache..." >> "$LOG"
@@ -65,4 +64,3 @@ docker volume prune -f >> "$LOG" 2>&1
 
 after=$(df /data --output=pcent | tail -1 | tr -d " %")
 echo "=== Done: ${usage}% -> ${after}% ===" >> "$LOG"
-echo "" >> "$LOG"
