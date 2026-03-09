@@ -59,6 +59,30 @@ echo "Optimizing power management for CI agent..."
 sudo pmset -a sleep 0 displaysleep 0 disksleep 0 powernap 0 \
     networkoversleep 1 womp 1 tcpkeepalive 1 2>/dev/null || true
 
+# ── 0. Prevent sleep (caffeinate) ─────────────
+# pmset sleep 0 does NOT prevent Maintenance Sleep on Apple Silicon.
+# caffeinate -s is required to prevent ALL sleep states.
+CAFFEINATE_PLIST="$HOME/Library/LaunchAgents/com.jenkins.caffeinate.plist"
+cat > "$CAFFEINATE_PLIST" << EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.jenkins.caffeinate</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/caffeinate</string>
+        <string>-s</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+</dict>
+</plist>
+EOF
+
 # ── 1. SSH Tunnel (autossh) ───────────────────
 TUNNEL_PLIST="$HOME/Library/LaunchAgents/com.jenkins.tunnel.plist"
 cat > "$TUNNEL_PLIST" << EOF
@@ -149,15 +173,17 @@ EOF
 # ── 3. Health Check Daemon ────────────────────
 cat > "$AGENT_DIR/check-agent-daemon.sh" << 'HEALTHCHECK'
 #!/bin/bash
-# Jenkins agent health check daemon — detects silent WebSocket disconnects
+# Jenkins agent health check daemon — API check + log staleness fallback
 AGENT_DIR="$HOME/jenkins-agent"
 PLIST="$HOME/Library/LaunchAgents/com.jenkins.agent.plist"
 LOGFILE="${AGENT_DIR}/check-agent.log"
 REMOTING_LOG="${AGENT_DIR}/remoting/logs/remoting.log.0"
 FAIL_MARKER="${AGENT_DIR}/.failing_since"
-STALE_THRESHOLD=600  # 10 min without log update = silent disconnect
-FAIL_THRESHOLD=300   # 5 min of continuous failures = restart
-CHECK_INTERVAL=60    # check every 60s
+JENKINS_API="http://localhost:18080/jenkins/computer/macmini/api/json?tree=offline,temporarilyOffline"
+JENKINS_AUTH="admin:admin"
+STALE_THRESHOLD=300  # 5 min log staleness = silent disconnect (fallback)
+FAIL_THRESHOLD=120   # 2 min of continuous offline = restart
+CHECK_INTERVAL=30    # check every 30s
 
 timestamp() { date '+%Y-%m-%d %H:%M:%S'; }
 
@@ -173,6 +199,20 @@ restart_agent() {
     echo "$(timestamp) Agent restarted." >> "$LOGFILE"
 }
 
+mark_offline() {
+    local NOW="$1"
+    if [ ! -f "$FAIL_MARKER" ]; then
+        date +%s > "$FAIL_MARKER"
+        echo "$(timestamp) Agent offline, monitoring..." >> "$LOGFILE"
+        return
+    fi
+    FAIL_SINCE=$(cat "$FAIL_MARKER")
+    FAIL_DURATION=$(( NOW - FAIL_SINCE ))
+    if [ "$FAIL_DURATION" -gt "$FAIL_THRESHOLD" ]; then
+        restart_agent "offline for ${FAIL_DURATION}s"
+    fi
+}
+
 echo "$(timestamp) Health check daemon started (PID $$)" >> "$LOGFILE"
 
 while true; do
@@ -181,6 +221,8 @@ while true; do
         tail -200 "$LOGFILE" > "${LOGFILE}.tmp" && mv "${LOGFILE}.tmp" "$LOGFILE"
     fi
 
+    NOW=$(date +%s)
+
     # 1. Process check
     if ! pgrep -f 'jenkins-agent/agent.jar' > /dev/null 2>&1; then
         restart_agent "process not running"
@@ -188,42 +230,51 @@ while true; do
         continue
     fi
 
-    # 2. Remoting log check
-    if [ ! -f "$REMOTING_LOG" ]; then
-        sleep "$CHECK_INTERVAL"
-        continue
-    fi
+    # 2. Try Jenkins API via SSH tunnel
+    HTTP_CODE=$(curl -s -m 5 -o /tmp/jenkins-agent-status.json -w '%{http_code}' \
+        --user "$JENKINS_AUTH" "$JENKINS_API" 2>/dev/null)
 
-    LOG_MTIME=$(stat -f %m "$REMOTING_LOG" 2>/dev/null)
-    NOW=$(date +%s)
-    LOG_AGE=$(( NOW - LOG_MTIME ))
+    if [ "$HTTP_CODE" = "200" ]; then
+        OFFLINE=$(python3 -c "import json;d=json.load(open('/tmp/jenkins-agent-status.json'));print(d.get('offline',False))" 2>/dev/null)
+        TEMP_OFFLINE=$(python3 -c "import json;d=json.load(open('/tmp/jenkins-agent-status.json'));print(d.get('temporarilyOffline',False))" 2>/dev/null)
 
-    LAST_STATUS=$(grep -E '(Connected$|Failed to connect|Terminated|Waiting .* before retry)' "$REMOTING_LOG" | tail -1)
-
-    if echo "$LAST_STATUS" | grep -q 'Connected$'; then
-        if [ "$LOG_AGE" -gt "$STALE_THRESHOLD" ]; then
-            restart_agent "log stale for ${LOG_AGE}s (silent disconnect)"
+        # Manually taken offline — don't touch
+        if [ "$TEMP_OFFLINE" = "True" ]; then
+            rm -f "$FAIL_MARKER"
             sleep "$CHECK_INTERVAL"
             continue
         fi
-        rm -f "$FAIL_MARKER"
+
+        if [ "$OFFLINE" = "False" ]; then
+            rm -f "$FAIL_MARKER"
+            sleep "$CHECK_INTERVAL"
+            continue
+        fi
+
+        # Jenkins says offline
+        mark_offline "$NOW"
         sleep "$CHECK_INTERVAL"
         continue
     fi
 
-    # 3. Failing state
-    if [ ! -f "$FAIL_MARKER" ]; then
-        date +%s > "$FAIL_MARKER"
-        echo "$(timestamp) Reconnecting..." >> "$LOGFILE"
-        sleep "$CHECK_INTERVAL"
-        continue
-    fi
+    # 3. Fallback: API unreachable (tunnel down) — use log staleness
+    if [ -f "$REMOTING_LOG" ]; then
+        LOG_MTIME=$(stat -f %m "$REMOTING_LOG" 2>/dev/null)
+        LOG_AGE=$(( NOW - LOG_MTIME ))
 
-    FAIL_SINCE=$(cat "$FAIL_MARKER")
-    FAIL_DURATION=$(( NOW - FAIL_SINCE ))
+        LAST_STATUS=$(grep -E '(Connected$|Failed to connect|Terminated)' "$REMOTING_LOG" | tail -1)
 
-    if [ "$FAIL_DURATION" -gt "$FAIL_THRESHOLD" ]; then
-        restart_agent "stuck reconnecting for ${FAIL_DURATION}s"
+        if echo "$LAST_STATUS" | grep -q 'Connected$' && [ "$LOG_AGE" -gt "$STALE_THRESHOLD" ]; then
+            mark_offline "$NOW"
+            sleep "$CHECK_INTERVAL"
+            continue
+        fi
+
+        if echo "$LAST_STATUS" | grep -qE 'Failed to connect|Terminated'; then
+            mark_offline "$NOW"
+            sleep "$CHECK_INTERVAL"
+            continue
+        fi
     fi
 
     sleep "$CHECK_INTERVAL"
@@ -259,7 +310,11 @@ EOF
 # ── Load all services ─────────────────────────
 echo "Loading services..."
 
-# 1. Tunnel first
+# 0. Caffeinate (prevent sleep)
+launchctl unload "$CAFFEINATE_PLIST" 2>/dev/null || true
+launchctl load -w "$CAFFEINATE_PLIST"
+
+# 1. Tunnel
 launchctl unload "$TUNNEL_PLIST" 2>/dev/null || true
 launchctl load -w "$TUNNEL_PLIST"
 echo "  Waiting for tunnel..."
@@ -285,9 +340,10 @@ echo ""
 echo "Jenkins JNLP agent installed with SSH tunnel + health check."
 echo ""
 echo "  Services:"
+echo "    com.jenkins.caffeinate   — Prevent system sleep (caffeinate -s)"
 echo "    com.jenkins.tunnel       — autossh SSH tunnel (port $TUNNEL_LOCAL_PORT)"
 echo "    com.jenkins.agent        — Jenkins agent (via tunnel)"
-echo "    com.jenkins.agent.check  — Health check daemon (60s interval)"
+echo "    com.jenkins.agent.check  — Health check daemon (30s interval)"
 echo ""
 echo "  Logs:"
 echo "    $AGENT_DIR/tunnel.log"
