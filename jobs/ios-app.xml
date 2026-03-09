@@ -39,7 +39,7 @@
         PATH = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
     }
     options {
-        timeout(time: 15, unit: "MINUTES")
+        timeout(time: 20, unit: "MINUTES")
         disableConcurrentBuilds()
         buildDiscarder(logRotator(numToKeepStr: "10"))
     }
@@ -65,7 +65,14 @@
         }
         stage("Test") {
             steps {
-                sh "xcodebuild -project arcana-ios.xcodeproj -scheme arcana-ios -destination 'platform=iOS Simulator,name=iPhone 17' test 2&gt;&amp;1 | tail -30"
+                sh '''
+                    xcrun simctl boot "iPhone 17" 2>/dev/null || true
+                    xcodebuild -project arcana-ios.xcodeproj -scheme arcana-ios \
+                        -destination 'platform=iOS Simulator,name=iPhone 17' \
+                        -test-timeouts-enabled YES \
+                        -maximum-test-execution-time-allowance 300 \
+                        test 2>&amp;1 | tail -30
+                '''
             }
         }
         stage("SonarQube Analysis") {
