@@ -55,7 +55,8 @@
                 dir("${env.PROJECTS_DIR}/arcana-embedded-stm32") {
                     sh "docker build -f Dockerfile.test -t stm32-test:ci . 2&gt;&amp;1"
                     sh "docker create --name stm32-cov stm32-test:ci"
-                    sh "docker cp stm32-cov:/workspace/coverage.info . 2&gt;/dev/null || echo 'No coverage.info generated'"
+                    sh "docker cp stm32-cov:/workspace/coverage.info . 2&gt;/dev/null || echo 'No coverage.info'"
+                    sh "docker cp stm32-cov:/workspace/coverage.xml  . 2&gt;/dev/null || echo 'No coverage.xml'"
                     sh "docker rm stm32-cov || true"
                     sh "ls -lh coverage.info 2&gt;/dev/null || true"
                 }
