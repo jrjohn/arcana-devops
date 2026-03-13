@@ -1,52 +1,72 @@
-<?xml version="1.1" encoding="UTF-8"?><flow-definition plugin="workflow-job@1571.vb_423c255d6d9">
+<?xml version='1.1' encoding='UTF-8'?>
+<flow-definition plugin="workflow-job@1571.vb_423c255d6d9">
   <actions>
     <org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobAction plugin="pipeline-model-definition@2.2277.v00573e73ddf1"/>
     <org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobPropertyTrackerAction plugin="pipeline-model-definition@2.2277.v00573e73ddf1">
       <jobProperties/>
-      <triggers/>
+      <triggers>
+        <string>hudson.triggers.SCMTrigger</string>
+      </triggers>
       <parameters/>
       <options/>
     </org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobPropertyTrackerAction>
   </actions>
   <description>STM32 Pipeline (compose)</description>
   <keepDependencies>false</keepDependencies>
-  <properties/>
-  <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@4256.v991a_f1991c03">
+  <properties>
+    <org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty>
+      <triggers>
+        <hudson.triggers.SCMTrigger>
+          <spec>H/5 * * * *</spec>
+          <ignorePostCommitHooks>false</ignorePostCommitHooks>
+        </hudson.triggers.SCMTrigger>
+      </triggers>
+    </org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty>
+  </properties>
+  <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@4257.vb_2e202808577">
     <script>pipeline {
     agent any
+    triggers {
+        pollSCM(&apos;H/5 * * * *&apos;)
+    }
     environment {
-        APP_NAME = "stm32-app"
-        VERSION  = "1.0.0"
+        APP_NAME = &quot;stm32-app&quot;
+        VERSION  = &quot;1.0.0&quot;
     }
     stages {
-        stage("Checkout") {
-            steps { echo "Using cloned repo: arcana-embedded-stm32" }
-        }
-        stage("Docker Compose Build") {
+        stage(&quot;Checkout&quot;) {
             steps {
-                dir("${env.PROJECTS_DIR}/arcana-embedded-stm32") {
-                    sh "VERSION=${VERSION} docker compose -f docker-compose.ci.yml build"
+                dir(&quot;${env.PROJECTS_DIR}/arcana-embedded-stm32&quot;) {
+                    git url: &apos;https://github.com/jrjohn/arcana-embedded-stm32.git&apos;,
+                        branch: &apos;main&apos;, credentialsId: &apos;github-credentials&apos;
                 }
             }
         }
-        stage("SonarQube Analysis") {
+        stage(&quot;Docker Compose Build&quot;) {
             steps {
-                echo "C requires SonarQube Developer Edition -- skipping analysis"
+                dir(&quot;${env.PROJECTS_DIR}/arcana-embedded-stm32&quot;) {
+                    sh &quot;VERSION=${VERSION} docker compose -f docker-compose.ci.yml build&quot;
+                }
             }
         }
-        stage("Extract Artifacts") {
+        stage(&quot;SonarQube Analysis&quot;) {
             steps {
-                sh "docker create --name ${APP_NAME}-out stm32-app-build:${VERSION} 2&gt;/dev/null || true"
-                sh "rm -rf /tmp/${APP_NAME}-firmware &amp;&amp; docker cp ${APP_NAME}-out:/artifacts/ /tmp/${APP_NAME}-firmware/ 2&gt;/dev/null || echo No artifacts dir"
-                sh "docker rm ${APP_NAME}-out 2&gt;/dev/null || true"
-                sh "ls -la /tmp/${APP_NAME}-firmware/ 2&gt;/dev/null || echo No firmware output"
+                echo &quot;C requires SonarQube Developer Edition -- skipping analysis&quot;
+            }
+        }
+        stage(&quot;Extract Artifacts&quot;) {
+            steps {
+                sh &quot;docker create --name ${APP_NAME}-out stm32-app-build:${VERSION} 2&gt;/dev/null || true&quot;
+                sh &quot;rm -rf /tmp/${APP_NAME}-firmware &amp;&amp; docker cp ${APP_NAME}-out:/artifacts/ /tmp/${APP_NAME}-firmware/ 2&gt;/dev/null || echo No artifacts dir&quot;
+                sh &quot;docker rm ${APP_NAME}-out 2&gt;/dev/null || true&quot;
+                sh &quot;ls -la /tmp/${APP_NAME}-firmware/ 2&gt;/dev/null || echo No firmware output&quot;
             }
         }
     }
     post {
-        success { echo "Pipeline SUCCESS - ${APP_NAME} firmware built" }
-        failure { echo "Pipeline FAILED" }
-        always  { echo "Build number ${BUILD_NUMBER} done" }
+        success { echo &quot;Pipeline SUCCESS - ${APP_NAME} firmware built&quot; }
+        failure { echo &quot;Pipeline FAILED&quot; }
+        always  { echo &quot;Build number ${BUILD_NUMBER} done&quot; }
     }
 }
 

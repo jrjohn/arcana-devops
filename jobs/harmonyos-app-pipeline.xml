@@ -1,78 +1,50 @@
-<?xml version="1.1" encoding="UTF-8"?><flow-definition plugin="workflow-job@1571.vb_423c255d6d9">
+<?xml version='1.1' encoding='UTF-8'?>
+<flow-definition plugin="workflow-job@1571.vb_423c255d6d9">
   <actions>
     <org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobAction plugin="pipeline-model-definition@2.2277.v00573e73ddf1"/>
     <org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobPropertyTrackerAction plugin="pipeline-model-definition@2.2277.v00573e73ddf1">
-      <jobProperties>
-        <string>org.jenkinsci.plugins.workflow.job.properties.DisableConcurrentBuildsJobProperty</string>
-      </jobProperties>
-      <triggers/>
+      <jobProperties/>
+      <triggers>
+        <string>hudson.triggers.SCMTrigger</string>
+      </triggers>
       <parameters/>
       <options/>
     </org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobPropertyTrackerAction>
   </actions>
+  <description>HarmonyOS App SonarQube Pipeline (ArkTS analysis)</description>
   <keepDependencies>false</keepDependencies>
   <properties>
-    <org.jenkinsci.plugins.workflow.job.properties.DisableConcurrentBuildsJobProperty>
-      <abortPrevious>false</abortPrevious>
-    </org.jenkinsci.plugins.workflow.job.properties.DisableConcurrentBuildsJobProperty>
+    <org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty>
+      <triggers>
+        <hudson.triggers.SCMTrigger>
+          <spec>H/5 * * * *</spec>
+          <ignorePostCommitHooks>false</ignorePostCommitHooks>
+        </hudson.triggers.SCMTrigger>
+      </triggers>
+    </org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty>
   </properties>
-  <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@4256.v991a_f1991c03">
-    <script>pipeline {
-    agent any
-    environment {
-        PROJECT_NAME = "harmonyos-app"
-    }
-    options {
-        timeout(time: 90, unit: "MINUTES")
-        disableConcurrentBuilds()
-    }
-    stages {
-        stage("Build HAP") {
-            steps {
-                dir("${env.PROJECTS_DIR}/arcana-harmonyos") {
-                    sh "docker compose -f docker-compose.ci.yml build"
-                    sh "docker compose -f docker-compose.ci.yml run --rm harmonyos-build"
-                }
-            }
-        }
-        stage("SonarQube Analysis") {
-            steps {
-                dir("${env.PROJECTS_DIR}/arcana-harmonyos") {
-                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                        withSonarQubeEnv('SonarQube') {
-                            sh '''sonar-scanner \
-                              -Dsonar.projectKey=harmonyos-app \
-                              -Dsonar.projectName="HarmonyOS App" \
-                              -Dsonar.sources=entry/src/main \
-                              -Dsonar.exclusions=node_modules/**,oh_modules/** \
-                              -Dsonar.scm.disabled=true \
-                              -Dsonar.coverage.jacoco.xmlReportPaths='''
-                        }
-                    }
-                }
-            }
-        }
-        stage("Verify HAP") {
-            steps {
-                dir("${env.PROJECTS_DIR}/arcana-harmonyos") {
-                    sh "ls -la entry/build/default/outputs/default/*.hap 2&gt;/dev/null || echo HAP not found"
-                }
-            }
-        }
-    }
-    post {
-        success { echo "HarmonyOS build succeeded: ${PROJECT_NAME}" }
-        failure { echo "HarmonyOS build FAILED: ${PROJECT_NAME}" }
-        always {
-            dir("${env.PROJECTS_DIR}/arcana-harmonyos") {
-                sh "docker compose -f docker-compose.ci.yml down --remove-orphans 2&gt;/dev/null || true"
-            }
-        }
-    }
-}
-
-</script>
-    <sandbox>true</sandbox>
+  <definition class="org.jenkinsci.plugins.workflow.cps.CpsScmFlowDefinition" plugin="workflow-cps@4257.vb_2e202808577">
+    <scm class="hudson.plugins.git.GitSCM" plugin="git@5.10.0">
+      <configVersion>2</configVersion>
+      <userRemoteConfigs>
+        <hudson.plugins.git.UserRemoteConfig>
+          <name>origin</name>
+          <url>https://github.com/jrjohn/arcana-harmonyos.git</url>
+          <credentialsId>github-credentials</credentialsId>
+        </hudson.plugins.git.UserRemoteConfig>
+      </userRemoteConfigs>
+      <branches>
+        <hudson.plugins.git.BranchSpec>
+          <name>*/main</name>
+        </hudson.plugins.git.BranchSpec>
+      </branches>
+      <doGenerateSubmoduleConfigurations>false</doGenerateSubmoduleConfigurations>
+      <submoduleCfg class="empty-list"/>
+      <extensions/>
+    </scm>
+    <scriptPath>Jenkinsfile</scriptPath>
+    <lightweight>true</lightweight>
   </definition>
+  <triggers/>
   <disabled>false</disabled>
 </flow-definition>

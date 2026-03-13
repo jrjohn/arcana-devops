@@ -43,6 +43,25 @@
                 }
             }
         }
+                stage("Cleanup Old Images") {
+            steps {
+                dir("${env.PROJECTS_DIR}/arcana-cloud-springboot") {
+                    sh '''
+                        # Remove dangling/unused images to free disk space
+                        docker image prune -f || true
+                        # Keep only last 3 build-tagged images for this app
+                        docker images --format '{{.Repository}}:{{.Tag}}' \
+                            | grep "${APP_NAME}.*build-" \
+                            | sort -t- -k2 -rn \
+                            | tail -n +4 \
+                            | xargs -r docker rmi 2&gt;/dev/null || true
+                        # Stop leftover test containers
+                        docker compose -f docker-compose.test.yml down \
+                            --remove-orphans 2&gt;/dev/null || true
+                    '''
+                }
+            }
+        }
         stage("Docker Compose Build") {
             steps {
                 dir("${env.PROJECTS_DIR}/arcana-cloud-springboot") {
@@ -60,7 +79,113 @@
                 }
             }
         }
-        stage("SonarQube Analysis") {
+        
+        stage("Integration: Layered HTTP") {
+            steps {
+                dir("${env.PROJECTS_DIR}/arcana-cloud-springboot") {
+                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                        sh '''
+                            # Pre-cleanup: remove any containers left by aborted/failed previous runs
+                            docker compose -p arcana-ci-http -f deployment/layered/docker-compose-ci-http.yml down -v --remove-orphans 2&gt;/dev/null || true
+                            docker compose -p arcana-ci-grpc -f deployment/layered/docker-compose-ci-grpc.yml down -v --remove-orphans 2&gt;/dev/null || true
+                            docker rm -f arcana-ci-mysql-http arcana-ci-redis-http arcana-ci-service-http arcana-ci-controller-http arcana-ci-mysql-grpc arcana-ci-redis-grpc arcana-ci-repository-grpc arcana-ci-service-grpc arcana-ci-controller-grpc 2&gt;/dev/null || true
+                            SPRINGBOOT_IMAGE="${IMAGE_TAG}:build-${BUILD_NUMBER}" \
+                                docker compose -p arcana-ci-http -f deployment/layered/docker-compose-ci-http.yml up -d
+                            JENKINS_ID=$(hostname)
+                            docker network connect arcana-ci-http-net $JENKINS_ID 2&gt;/dev/null || true
+                            bash scripts/integration-smoke-test.sh http://arcana-ci-controller-http:8090 http 180
+                            docker network disconnect arcana-ci-http-net $JENKINS_ID 2&gt;/dev/null || true
+                        '''
+                    }
+                }
+            }
+            post {
+                always {
+                    dir("${env.PROJECTS_DIR}/arcana-cloud-springboot/deployment/layered") {
+                        sh 'docker compose -p arcana-ci-http -f docker-compose-ci-http.yml down -v --remove-orphans 2&gt;/dev/null || true'
+                    }
+                }
+            }
+        }
+        stage("Integration: Layered gRPC") {
+            steps {
+                dir("${env.PROJECTS_DIR}/arcana-cloud-springboot") {
+                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                        sh '''
+                            # Pre-cleanup: remove any containers left by aborted/failed previous runs
+                            docker compose -p arcana-ci-http -f deployment/layered/docker-compose-ci-http.yml down -v --remove-orphans 2&gt;/dev/null || true
+                            docker compose -p arcana-ci-grpc -f deployment/layered/docker-compose-ci-grpc.yml down -v --remove-orphans 2&gt;/dev/null || true
+                            docker rm -f arcana-ci-mysql-http arcana-ci-redis-http arcana-ci-service-http arcana-ci-controller-http arcana-ci-mysql-grpc arcana-ci-redis-grpc arcana-ci-repository-grpc arcana-ci-service-grpc arcana-ci-controller-grpc 2&gt;/dev/null || true
+                            SPRINGBOOT_IMAGE="${IMAGE_TAG}:build-${BUILD_NUMBER}" \
+                                docker compose -p arcana-ci-grpc -f deployment/layered/docker-compose-ci-grpc.yml up -d
+                            JENKINS_ID=$(hostname)
+                            docker network connect arcana-ci-grpc-net $JENKINS_ID 2&gt;/dev/null || true
+                            bash scripts/integration-smoke-test.sh http://arcana-ci-controller-grpc:8090 grpc 270
+                            docker network disconnect arcana-ci-grpc-net $JENKINS_ID 2&gt;/dev/null || true
+                        '''
+                    }
+                }
+            }
+            post {
+                always {
+                    dir("${env.PROJECTS_DIR}/arcana-cloud-springboot/deployment/layered") {
+                        sh 'docker compose -p arcana-ci-grpc -f docker-compose-ci-grpc.yml down -v --remove-orphans 2&gt;/dev/null || true'
+                    }
+                }
+            }
+        }
+        stage("Integration: K8s HTTP") {
+            steps {
+                dir("${env.PROJECTS_DIR}/arcana-cloud-springboot") {
+                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                        sh '''#!/bin/bash
+                            export PATH="/var/jenkins_home/bin:${PATH}"
+                            kind version || { echo "kind not found"; exit 1; }
+                            bash scripts/kind-smoke-test.sh "${IMAGE_TAG}:build-${BUILD_NUMBER}" http 480
+                        '''
+                    }
+                }
+            }
+            post {
+                always {
+                    dir("${env.PROJECTS_DIR}/arcana-cloud-springboot") {
+                        sh '''#!/bin/bash
+                            export PATH="/var/jenkins_home/bin:${PATH}"
+                            kind get clusters 2&gt;/dev/null | grep arcana-ci | while read cl; do
+                              kind delete cluster --name "$cl" 2&gt;/dev/null || true
+                            done
+                        '''
+                    }
+                }
+            }
+        }
+           stage("Integration: K8s gRPC") {
+            steps {
+                dir("${env.PROJECTS_DIR}/arcana-cloud-springboot") {
+                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                        sh '''#!/bin/bash
+                            export PATH="/var/jenkins_home/bin:${PATH}"
+                            kind version || { echo "kind not found"; exit 1; }
+                            kubectl version --client || true
+                            bash scripts/kind-smoke-test.sh "${IMAGE_TAG}:build-${BUILD_NUMBER}" grpc 600
+                        '''
+                    }
+                }
+            }
+            post {
+                always {
+                    dir("${env.PROJECTS_DIR}/arcana-cloud-springboot") {
+                        sh '''#!/bin/bash
+                            export PATH="/var/jenkins_home/bin:${PATH}"
+                            kind get clusters 2&gt;/dev/null | grep arcana-ci | while read cl; do
+                              kind delete cluster --name "$cl" 2&gt;/dev/null || true
+                            done
+                        '''
+                    }
+                }
+            }
+        }
+           stage("SonarQube Analysis") {
             steps {
                 dir("${env.PROJECTS_DIR}/arcana-cloud-springboot") {
                     catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {

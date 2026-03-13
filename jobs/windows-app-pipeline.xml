@@ -1,5 +1,4 @@
-<?xml version='1.1' encoding='UTF-8'?>
-<flow-definition plugin="workflow-job@1571.vb_423c255d6d9">
+<?xml version="1.1" encoding="UTF-8"?><flow-definition plugin="workflow-job@1571.vb_423c255d6d9">
   <actions>
     <org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobAction plugin="pipeline-model-definition@2.2277.v00573e73ddf1"/>
     <org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobPropertyTrackerAction plugin="pipeline-model-definition@2.2277.v00573e73ddf1">
@@ -30,84 +29,73 @@
   </properties>
   <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@4256.v991a_f1991c03">
     <script>pipeline {
-    agent { label &apos;windows&apos; }
+    agent { label 'windows' }
+    triggers {
+        pollSCM('H/5 * * * *')
+    }
     environment {
-        APP_NAME    = &apos;arcana-windows&apos;
-        VERSION     = &apos;0.1.0&apos;
-        PROJECT_DIR = &apos;C:\\Users\\jenkins\\devops-test\\arcana-windows&apos;
+        APP_NAME = 'arcana-windows'
+        VERSION  = '0.1.0'
     }
     options {
-        timeout(time: 30, unit: &apos;MINUTES&apos;)
+        timeout(time: 30, unit: 'MINUTES')
         disableConcurrentBuilds()
-        buildDiscarder(logRotator(numToKeepStr: &apos;10&apos;))
+        buildDiscarder(logRotator(numToKeepStr: '10'))
     }
     stages {
-        stage(&apos;Checkout&apos;) {
+        stage('Checkout') {
             steps {
-                dir(&quot;${PROJECT_DIR}&quot;) {
-                    bat &apos;git pull origin main || echo &quot;Pull skipped&quot;&apos;
-                }
-                echo &quot;Building ${APP_NAME} WinUI 3 v${VERSION}&quot;
-            }
-        }
-        stage(&apos;Restore&apos;) {
-            steps {
-                dir(&quot;${PROJECT_DIR}&quot;) {
-                    bat &quot;dotnet restore Arcana.Windows.sln&quot;
+                withCredentials([usernamePassword(credentialsId: 'github-credentials', usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS')]) {
+                    bat "if exist .git (git fetch --tags --force --progress https://%GIT_USER%:%GIT_PASS%@github.com/jrjohn/arcana-windows.git +refs/heads/*:refs/remotes/origin/* &amp;&amp; git checkout -f origin/main) else (git clone --branch main https://%GIT_USER%:%GIT_PASS%@github.com/jrjohn/arcana-windows.git .)"
                 }
             }
         }
-        stage(&apos;Build&apos;) {
+        stage('Restore') {
             steps {
-                dir(&quot;${PROJECT_DIR}&quot;) {
-                    bat &quot;dotnet build src\\Arcana.App\\Arcana.App.csproj -c Release -p:Platform=x64 -maxcpucount:1&quot;
-                }
+                bat "dotnet restore Arcana.Windows.sln --force-evaluate"
             }
         }
-        stage(&apos;Unit Tests&apos;) {
+        stage('Build') {
             steps {
-                dir(&quot;${PROJECT_DIR}&quot;) {
-                    bat &quot;if exist TestResults rmdir /s /q TestResults&quot;
-                    bat &quot;dotnet test -c Release -p:Platform=x64 --logger trx --results-directory TestResults || exit 0&quot;
-                }
+                bat "dotnet build src\\Arcana.App\\Arcana.App.csproj -c Release -p:Platform=x64 -maxcpucount:1"
+            }
+        }
+        stage('Unit Tests') {
+            steps {
+                bat "if exist TestResults rmdir /s /q TestResults"
+                bat "dotnet test -c Release -p:Platform=x64 --logger trx --results-directory TestResults || exit 0"
             }
             post {
                 always {
-                    dir(&quot;${PROJECT_DIR}&quot;) {
-                        junit allowEmptyResults: true, testResults: &apos;TestResults/**/*.trx&apos;
-                    }
+                    junit allowEmptyResults: true, testResults: 'TestResults/**/*.trx'
                 }
             }
         }
-        stage(&apos;SonarQube Analysis&apos;) {
+        stage('SonarQube Analysis') {
             steps {
-                echo &quot;Windows remote agent requires dotnet-sonarscanner + Java -- skipping (see advanced setup)&quot;
+                echo "Windows remote agent requires dotnet-sonarscanner + Java -- skipping (see advanced setup)"
             }
         }
-        stage(&apos;Publish EXE&apos;) {
+        stage('Publish EXE') {
             steps {
-                dir(&quot;${PROJECT_DIR}&quot;) {
-                    bat &quot;if exist artifacts\\exe rmdir /s /q artifacts\\exe&quot;
-                    bat &quot;dotnet publish src\\Arcana.App\\Arcana.App.csproj -c Release -p:Platform=x64 -p:WindowsPackageType=None --self-contained -r win-x64 -o artifacts\\exe -maxcpucount:1&quot;
-                    archiveArtifacts artifacts: &apos;artifacts/exe/Arcana.App.exe&apos;, fingerprint: true
-                }
+                bat "if exist artifacts\\exe rmdir /s /q artifacts\\exe"
+                bat "dotnet publish src\\Arcana.App\\Arcana.App.csproj -c Release -p:Platform=x64 -p:WindowsPackageType=None --self-contained -r win-x64 -o artifacts\\exe -maxcpucount:1"
+                archiveArtifacts artifacts: 'artifacts/exe/Arcana.App.exe', fingerprint: true
             }
         }
-        stage(&apos;MSIX Package&apos;) {
+        stage('MSIX Package') {
             steps {
-                dir(&quot;${PROJECT_DIR}&quot;) {
-                    bat &quot;if exist artifacts\\msix rmdir /s /q artifacts\\msix&quot;
-                    bat &quot;dotnet publish src\\Arcana.App\\Arcana.App.csproj -c Release -p:Platform=x64 -p:WindowsPackageType=MSIX -p:AppxPackageSigningEnabled=false -p:GenerateAppxPackageOnBuild=true -maxcpucount:1&quot;
-                    bat &quot;mkdir artifacts\\msix 2&gt;NUL &amp; copy /Y src\\Arcana.App\\obj\\x64\\Release\\net10.0-windows10.0.19041.0\\win-x64\\MsixContent\\MSIX\\*.msix artifacts\\msix\\ 2&gt;NUL &amp; echo MSIX collected&quot;
-                    archiveArtifacts artifacts: &apos;artifacts/msix/*.msix&apos;, fingerprint: true, allowEmptyArchive: true
-                }
+                bat "if exist artifacts\\msix rmdir /s /q artifacts\\msix"
+                bat "dotnet publish src\\Arcana.App\\Arcana.App.csproj -c Release -p:Platform=x64 -p:WindowsPackageType=MSIX -p:AppxPackageSigningEnabled=false -p:GenerateAppxPackageOnBuild=true -maxcpucount:1"
+                bat "mkdir artifacts\\msix 2&gt;NUL &amp; copy /Y src\\Arcana.App\\obj\\x64\\Release\\net10.0-windows10.0.19041.0\\win-x64\\MsixContent\\MSIX\\*.msix artifacts\\msix\\ 2&gt;NUL &amp; echo MSIX collected"
+                archiveArtifacts artifacts: 'artifacts/msix/*.msix', fingerprint: true, allowEmptyArchive: true
             }
         }
     }
     post {
-        success { echo &quot;Windows build SUCCESS - ${APP_NAME} v${VERSION} (EXE + MSIX)&quot; }
-        failure { echo &quot;Windows build FAILED - ${APP_NAME}&quot; }
-        always  { echo &quot;Build number ${BUILD_NUMBER} done&quot; }
+        success { echo "Windows build SUCCESS - ${APP_NAME} v${VERSION} (EXE + MSIX)" }
+        failure { echo "Windows build FAILED - ${APP_NAME}" }
+        always  { echo "Build number ${BUILD_NUMBER} done" }
     }
 }</script>
     <sandbox>true</sandbox>

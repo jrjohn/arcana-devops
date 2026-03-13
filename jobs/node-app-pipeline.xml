@@ -43,6 +43,22 @@
                 }
             }
         }
+        stage("Cleanup Old Images") {
+            steps {
+                dir("${env.PROJECTS_DIR}/arcana-cloud-nodejs") {
+                    sh '''
+                        docker image prune -f || true
+                        docker images --format ''{{.Repository}}:{{.Tag}}'' \
+                            | grep "${APP_NAME}.*build-" \
+                            | sort -t- -k2 -rn \
+                            | tail -n +4 \
+                            | xargs -r docker rmi 2&gt;/dev/null || true
+                        docker compose -f docker-compose.test.yml down \
+                            --remove-orphans 2&gt;/dev/null || true
+                    '''
+                }
+            }
+        }
         stage("Docker Compose Build") {
             steps {
                 dir("${env.PROJECTS_DIR}/arcana-cloud-nodejs") {
@@ -60,16 +76,116 @@
                 }
             }
         }
-        stage("SonarQube Analysis") {
+
+        stage("Integration: Layered HTTP") {
             steps {
                 dir("${env.PROJECTS_DIR}/arcana-cloud-nodejs") {
                     catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                        sh '''
+                            JENKINS_ID=$(hostname)
+                            NODE_IMAGE=placeholder docker compose -p arcana-ci-node-http \
+                                -f deployment/layered/docker-compose-ci-http.yml \
+                                down -v --remove-orphans 2&gt;/dev/null || true
+                            NODE_IMAGE=${IMAGE_TAG}:build-${BUILD_NUMBER} \
+                            docker compose -p arcana-ci-node-http \
+                                -f deployment/layered/docker-compose-ci-http.yml up -d
+                            docker network connect arcana-ci-node-net $JENKINS_ID 2&gt;/dev/null || true
+                            bash scripts/integration-smoke-test.sh \
+                                http://arcana-ci-node-controller:3000 http-layered 300
+                            docker network disconnect arcana-ci-node-net $JENKINS_ID 2&gt;/dev/null || true
+                        '''
+                    }
+                }
+            }
+            post {
+                always {
+                    dir("${env.PROJECTS_DIR}/arcana-cloud-nodejs") {
+                        sh '''
+                            docker network disconnect arcana-ci-node-net $(hostname) 2&gt;/dev/null || true
+                            NODE_IMAGE=placeholder docker compose -p arcana-ci-node-http \
+                                -f deployment/layered/docker-compose-ci-http.yml \
+                                down -v --remove-orphans 2&gt;/dev/null || true
+                        '''
+                    }
+                }
+            }
+        }
+        stage("Integration: Layered gRPC") {
+            steps {
+                dir("${env.PROJECTS_DIR}/arcana-cloud-nodejs") {
+                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                        sh '''
+                            JENKINS_ID=$(hostname)
+                            NODE_IMAGE=placeholder docker compose -p arcana-ci-node-grpc \
+                                -f deployment/layered/docker-compose-ci-grpc.yml \
+                                down -v --remove-orphans 2&gt;/dev/null || true
+                            NODE_IMAGE=${IMAGE_TAG}:build-${BUILD_NUMBER} \
+                            docker compose -p arcana-ci-node-grpc \
+                                -f deployment/layered/docker-compose-ci-grpc.yml up -d
+                            docker network connect arcana-ci-node-grpc-net $JENKINS_ID 2&gt;/dev/null || true
+                            bash scripts/integration-smoke-test.sh \
+                                http://arcana-ci-node-grpc-controller:3000 grpc-layered 300
+                            docker network disconnect arcana-ci-node-grpc-net $JENKINS_ID 2&gt;/dev/null || true
+                        '''
+                    }
+                }
+            }
+            post {
+                always {
+                    dir("${env.PROJECTS_DIR}/arcana-cloud-nodejs") {
+                        sh '''
+                            echo "=== Controller container logs ==="
+                            docker logs arcana-ci-node-grpc-controller 2&gt;&amp;1 | tail -50 || true
+                            echo "=== Service container logs ==="
+                            docker logs arcana-ci-node-grpc-service 2&gt;&amp;1 | tail -50 || true
+                            echo "=== Repository container logs ==="
+                            docker logs arcana-ci-node-grpc-repository 2&gt;&amp;1 | tail -30 || true
+                            docker network disconnect arcana-ci-node-grpc-net $(hostname) 2&gt;/dev/null || true
+                            NODE_IMAGE=placeholder docker compose -p arcana-ci-node-grpc \
+                                -f deployment/layered/docker-compose-ci-grpc.yml \
+                                down -v --remove-orphans 2&gt;/dev/null || true
+                        '''
+                    }
+                }
+            }
+        }
+        stage("Integration: K8s gRPC") {
+            steps {
+                dir("${env.PROJECTS_DIR}/arcana-cloud-nodejs") {
+                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                        sh '''#!/bin/bash
+                            export PATH="/var/jenkins_home/bin:${PATH}"
+                            kind version || { echo "kind not found"; exit 1; }
+                            bash scripts/kind-smoke-test.sh "${IMAGE_TAG}:build-${BUILD_NUMBER}" grpc 480
+                        '''
+                    }
+                }
+            }
+            post {
+                always {
+                    dir("${env.PROJECTS_DIR}/arcana-cloud-nodejs") {
+                        sh '''#!/bin/bash
+                            export PATH="/var/jenkins_home/bin:${PATH}"
+                            kind get clusters 2&gt;/dev/null | grep arcana-ci | while read cl; do
+                              kind delete cluster --name "$cl" 2&gt;/dev/null || true
+                            done
+                        '''
+                    }
+                }
+            }
+        }
+                stage("SonarQube Analysis") {
+            steps {
+                dir("${env.PROJECTS_DIR}/arcana-cloud-nodejs") {
+                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                        sh 'npm ci --ignore-scripts --no-audit --no-fund 2&gt;/dev/null || npm install --ignore-scripts --no-audit --no-fund 2&gt;/dev/null || true'
                         withSonarQubeEnv('SonarQube') {
                             sh '''sonar-scanner \
                               -Dsonar.projectKey=node-app \
                               -Dsonar.projectName="Node App" \
                               -Dsonar.sources=src \
                               -Dsonar.exclusions=coverage/**,**/lcov-report/**,**/*.html,node_modules/**,dist/**,src/grpc/generated/** \
+                              -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
                               -Dsonar.scm.disabled=true'''
                         }
                     }
@@ -94,7 +210,6 @@
         always  { echo "Build number ${BUILD_NUMBER} done" }
     }
 }
-
 </script>
     <sandbox>true</sandbox>
   </definition>

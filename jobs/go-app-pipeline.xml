@@ -43,11 +43,94 @@
                 }
             }
         }
+                stage("Cleanup Old Images") {
+            steps {
+                dir("${env.PROJECTS_DIR}/arcana-cloud-go") {
+                    sh '''
+                        # Remove dangling/unused images to free disk space
+                        docker image prune -f || true
+                        # Keep only last 3 build-tagged images for this app
+                        docker images --format '{{.Repository}}:{{.Tag}}' \
+                            | grep "${APP_NAME}.*build-" \
+                            | sort -t- -k2 -rn \
+                            | tail -n +4 \
+                            | xargs -r docker rmi 2&gt;/dev/null || true
+                        # Stop leftover test containers
+                        docker compose -f docker-compose.test.yml down \
+                            --remove-orphans 2&gt;/dev/null || true
+                    '''
+                }
+            }
+        }
         stage("Docker Compose Build") {
             steps {
                 dir("${env.PROJECTS_DIR}/arcana-cloud-go") {
                     sh "VERSION=${VERSION} DOCKER_REGISTRY=${REGISTRY} docker compose -f docker-compose.ci.yml build"
                     sh "docker tag ${IMAGE_TAG}:${VERSION} ${IMAGE_TAG}:build-${BUILD_NUMBER}"
+                    sh "docker create --name go-cov-tmp ${IMAGE_TAG}:${VERSION}; docker cp go-cov-tmp:/tmp/coverage.out coverage.out || true; docker rm go-cov-tmp || true"
+                }
+            }
+        }
+
+        stage("Integration: Layered gRPC") {
+            steps {
+                dir("${env.PROJECTS_DIR}/arcana-cloud-go") {
+                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                        sh '''
+                            JENKINS_ID=$(hostname)
+                            # Cleanup any leftover containers
+                            GO_IMAGE=placeholder docker compose -p arcana-ci-go-grpc \
+                                -f deployment/layered/docker-compose-ci-grpc.yml \
+                                down -v --remove-orphans 2&gt;/dev/null || true
+                            # Start 3-layer gRPC stack
+                            GO_IMAGE=${IMAGE_TAG}:build-${BUILD_NUMBER} \
+                            docker compose -p arcana-ci-go-grpc \
+                                -f deployment/layered/docker-compose-ci-grpc.yml up -d
+                            # Connect Jenkins to compose network
+                            docker network connect arcana-ci-go-net $JENKINS_ID 2&gt;/dev/null || true
+                            # Run smoke test via internal container name
+                            bash scripts/integration-smoke-test.sh \
+                                http://arcana-ci-go-controller:8090 grpc-layered 240
+                            docker network disconnect arcana-ci-go-net $JENKINS_ID 2&gt;/dev/null || true
+                        '''
+                    }
+                }
+            }
+            post {
+                always {
+                    dir("${env.PROJECTS_DIR}/arcana-cloud-go") {
+                        sh '''
+                            docker network disconnect arcana-ci-go-net $(hostname) 2&gt;/dev/null || true
+                            GO_IMAGE=placeholder docker compose -p arcana-ci-go-grpc \
+                                -f deployment/layered/docker-compose-ci-grpc.yml \
+                                down -v --remove-orphans 2&gt;/dev/null || true
+                        '''
+                    }
+                }
+            }
+        }
+        stage("Integration: K8s gRPC") {
+            steps {
+                dir("${env.PROJECTS_DIR}/arcana-cloud-go") {
+                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                        sh '''#!/bin/bash
+                            export PATH="/var/jenkins_home/bin:${PATH}"
+                            kind version || { echo "kind not found"; exit 1; }
+                            bash scripts/kind-smoke-test.sh "${IMAGE_TAG}:build-${BUILD_NUMBER}" grpc 480
+                        '''
+                    }
+                }
+            }
+            post {
+                always {
+                    dir("${env.PROJECTS_DIR}/arcana-cloud-go") {
+                        sh '''#!/bin/bash
+                            export PATH="/var/jenkins_home/bin:${PATH}"
+                            kind get clusters 2&gt;/dev/null | grep arcana-ci | while read cl; do
+                              kind delete cluster --name "$cl" 2&gt;/dev/null || true
+                            done
+                        '''
+                    }
                 }
             }
         }
@@ -60,10 +143,11 @@
                               -Dsonar.projectKey=go-app \
                               -Dsonar.projectName="Go App" \
                               -Dsonar.sources=. \
-                              -Dsonar.exclusions=vendor/**,*_test.go,internal/testutil/mocks/**,internal/jobs/scheduler/scheduler.go \
+                              -Dsonar.exclusions=vendor/**,*_test.go,internal/testutil/mocks/**,internal/jobs/scheduler/scheduler.go,api/proto/pb/**,**/*.pb.go \
                               -Dsonar.text.inclusions.activate=false \
                               -Dsonar.scm.disabled=true \
-                              -Dsonar.coverage.jacoco.xmlReportPaths='''
+                              -Dsonar.coverage.jacoco.xmlReportPaths= \\
+                              -Dsonar.go.coverage.reportPaths=coverage.out'''
                         }
                     }
                 }

@@ -1,5 +1,4 @@
-<?xml version='1.1' encoding='UTF-8'?>
-<flow-definition plugin="workflow-job@1571.vb_423c255d6d9">
+<?xml version="1.1" encoding="UTF-8"?><flow-definition plugin="workflow-job@1571.vb_423c255d6d9">
   <actions>
     <org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobAction plugin="pipeline-model-definition@2.2277.v00573e73ddf1"/>
     <org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobPropertyTrackerAction plugin="pipeline-model-definition@2.2277.v00573e73ddf1">
@@ -27,62 +26,84 @@
     <script>pipeline {
     agent any
     triggers {
-        pollSCM(&apos;H/5 * * * *&apos;)
+        pollSCM('H/5 * * * *')
     }
     environment {
-        APP_NAME  = &quot;angular-app&quot;
-        REGISTRY  = &quot;localhost:5000&quot;
-        IMAGE_TAG = &quot;${REGISTRY}/arcana/${APP_NAME}&quot;
-        VERSION   = &quot;1.0.0&quot;
+        APP_NAME  = "angular-app"
+        REGISTRY  = "localhost:5000"
+        IMAGE_TAG = "${REGISTRY}/arcana/${APP_NAME}"
+        VERSION   = "1.0.0"
     }
     stages {
-        stage(&quot;Checkout&quot;) {
+        stage("Checkout") {
             steps {
-                dir(&quot;${env.PROJECTS_DIR}/arcana-angular&quot;) {
-                    git url: &apos;https://github.com/jrjohn/arcana-angular.git&apos;,
-                        branch: &apos;main&apos;, credentialsId: &apos;github-credentials&apos;
+                dir("${env.PROJECTS_DIR}/arcana-angular") {
+                    git url: 'https://github.com/jrjohn/arcana-angular.git',
+                        branch: 'main', credentialsId: 'github-credentials'
                 }
             }
         }
-        stage(&quot;Docker Compose Build&quot;) {
+                stage("Cleanup Old Images") {
             steps {
-                dir(&quot;${env.PROJECTS_DIR}/arcana-angular&quot;) {
-                    sh &quot;VERSION=${VERSION} docker compose -f docker-compose.ci.yml build&quot;
-                    sh &quot;docker tag localhost:5000/arcana/${APP_NAME}:${VERSION} ${IMAGE_TAG}:build-${BUILD_NUMBER}&quot;
+                dir("${env.PROJECTS_DIR}/arcana-angular") {
+                    sh '''
+                        # Remove dangling/unused images to free disk space
+                        docker image prune -f || true
+                        # Keep only last 3 build-tagged images for this app
+                        docker images --format '{{.Repository}}:{{.Tag}}' \
+                            | grep "${APP_NAME}.*build-" \
+                            | sort -t- -k2 -rn \
+                            | tail -n +4 \
+                            | xargs -r docker rmi 2&gt;/dev/null || true
+                        # Stop leftover test containers
+                        docker compose -f docker-compose.test.yml down \
+                            --remove-orphans 2&gt;/dev/null || true
+                    '''
                 }
             }
         }
-        stage(&quot;SonarQube Analysis&quot;) {
+        stage("Docker Compose Build") {
             steps {
-                dir(&quot;${env.PROJECTS_DIR}/arcana-angular&quot;) {
-                    catchError(buildResult: &apos;SUCCESS&apos;, stageResult: &apos;UNSTABLE&apos;) {
-                        withSonarQubeEnv(&apos;SonarQube&apos;) {
-                            sh &apos;&apos;&apos;sonar-scanner \
-                              -Dsonar.projectKey=angular-app \
-                              -Dsonar.projectName=&quot;Angular App&quot; \
-                              -Dsonar.sources=src \
-                              -Dsonar.exclusions=node_modules/**,dist/** \
-                              -Dsonar.scm.disabled=true \
-                              -Dsonar.coverage.jacoco.xmlReportPaths=&apos;&apos;&apos;
+                dir("${env.PROJECTS_DIR}/arcana-angular") {
+                    sh "VERSION=${VERSION} docker compose -f docker-compose.ci.yml build"
+                    sh "docker tag localhost:5000/arcana/${APP_NAME}:${VERSION} ${IMAGE_TAG}:build-${BUILD_NUMBER}"
+                }
+            }
+        }
+        stage("Test Coverage") {
+            steps {
+                dir("${env.PROJECTS_DIR}/arcana-angular") {
+                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                        sh 'docker compose -f docker-compose.test.yml run --build --rm test'
+                    }
+                }
+            }
+        }
+        stage("SonarQube Analysis") {
+            steps {
+                dir("${env.PROJECTS_DIR}/arcana-angular") {
+                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                        withSonarQubeEnv('SonarQube') {
+                            sh 'sonar-scanner -Dsonar.projectKey=angular-app -Dsonar.scm.disabled=true'
                         }
                     }
                 }
             }
         }
-        stage(&quot;Image Info&quot;) {
-            steps { sh &quot;docker images --format &apos;table {{.Repository}}:{{.Tag}}\t{{.Size}}&apos; ${IMAGE_TAG}:${VERSION}&quot; }
+        stage("Image Info") {
+            steps { sh "docker images --format 'table {{.Repository}}:{{.Tag}}\t{{.Size}}' ${IMAGE_TAG}:${VERSION}" }
         }
-        stage(&quot;Push to Registry&quot;) {
+        stage("Push to Registry") {
             steps {
-                sh &quot;docker push ${IMAGE_TAG}:${VERSION}&quot;
-                sh &quot;docker push ${IMAGE_TAG}:build-${BUILD_NUMBER}&quot;
+                sh "docker push ${IMAGE_TAG}:${VERSION}"
+                sh "docker push ${IMAGE_TAG}:build-${BUILD_NUMBER}"
             }
         }
     }
     post {
-        success { echo &quot;Pipeline SUCCESS - ${APP_NAME}:${VERSION}&quot; }
-        failure { echo &quot;Pipeline FAILED&quot; }
-        always  { echo &quot;Build number ${BUILD_NUMBER} done&quot; }
+        success { echo "Pipeline SUCCESS - ${APP_NAME}:${VERSION}" }
+        failure { echo "Pipeline FAILED" }
+        always  { echo "Build number ${BUILD_NUMBER} done" }
     }
 }
 

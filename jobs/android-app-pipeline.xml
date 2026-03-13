@@ -1,5 +1,4 @@
-<?xml version='1.1' encoding='UTF-8'?>
-<flow-definition plugin="workflow-job@1571.vb_423c255d6d9">
+<?xml version="1.1" encoding="UTF-8"?><flow-definition plugin="workflow-job@1571.vb_423c255d6d9">
   <actions>
     <org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobAction plugin="pipeline-model-definition@2.2277.v00573e73ddf1"/>
     <org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobPropertyTrackerAction plugin="pipeline-model-definition@2.2277.v00573e73ddf1">
@@ -41,72 +40,101 @@
     <script>pipeline {
     agent any
     triggers {
-        pollSCM(&apos;H/5 * * * *&apos;)
+        pollSCM('H/5 * * * *')
     }
     environment {
-        PROJECT_NAME = &quot;android-app&quot;
-        PROJECT_DIR  = &quot;${env.PROJECTS_DIR}/arcana-android&quot;
+        PROJECT_NAME = "android-app"
+        PROJECT_DIR  = "${env.PROJECTS_DIR}/arcana-android"
     }
     options {
-        timeout(time: 90, unit: &quot;MINUTES&quot;)
+        timeout(time: 90, unit: "MINUTES")
         disableConcurrentBuilds()
-        buildDiscarder(logRotator(numToKeepStr: &quot;10&quot;))
+        buildDiscarder(logRotator(numToKeepStr: "10"))
     }
     stages {
-        stage(&quot;Checkout&quot;) {
+        stage("Checkout") {
             steps {
-                dir(&quot;${env.PROJECTS_DIR}/arcana-android&quot;) {
-                    git url: &apos;https://github.com/jrjohn/arcana-android.git&apos;,
-                        branch: &apos;main&apos;, credentialsId: &apos;github-credentials&apos;
+                dir("${env.PROJECTS_DIR}/arcana-android") {
+                    git url: 'https://github.com/jrjohn/arcana-android.git',
+                        branch: 'main', credentialsId: 'github-credentials'
                 }
             }
         }
-        stage(&quot;Docker Compose Build&quot;) {
+                stage("Cleanup Old Images") {
             steps {
-                dir(&quot;${PROJECT_DIR}&quot;) {
-                    sh &quot;docker compose -f docker-compose.ci.yml build&quot;
+                dir("${env.PROJECTS_DIR}/arcana-android") {
+                    sh '''
+                        # Remove dangling/unused images to free disk space
+                        docker image prune -f || true
+                        # Keep only last 3 build-tagged images for this app
+                        docker images --format '{{.Repository}}:{{.Tag}}' \
+                            | grep "${APP_NAME}.*build-" \
+                            | sort -t- -k2 -rn \
+                            | tail -n +4 \
+                            | xargs -r docker rmi 2&gt;/dev/null || true
+                        # Stop leftover test containers
+                        docker compose -f docker-compose.test.yml down \
+                            --remove-orphans 2&gt;/dev/null || true
+                    '''
                 }
             }
         }
-        stage(&quot;Gradle Build&quot;) {
+        stage("Docker Compose Build") {
             steps {
-                dir(&quot;${PROJECT_DIR}&quot;) {
-                    sh &quot;docker compose -f docker-compose.ci.yml run --rm android-build&quot;
+                dir("${PROJECT_DIR}") {
+                    sh "docker compose -f docker-compose.ci.yml build"
                 }
             }
         }
-        stage(&quot;SonarQube Analysis&quot;) {
+        stage("Gradle Build") {
             steps {
-                dir(&quot;${PROJECT_DIR}&quot;) {
-                    catchError(buildResult: &apos;SUCCESS&apos;, stageResult: &apos;UNSTABLE&apos;) {
-                        withSonarQubeEnv(&apos;SonarQube&apos;) {
-                            sh &apos;&apos;&apos;sonar-scanner \
+                dir("${PROJECT_DIR}") {
+                    sh "docker compose -f docker-compose.ci.yml run --rm android-build"
+                }
+            }
+        }
+        stage("Unit Tests with Coverage") {
+            steps {
+                dir("${PROJECT_DIR}") {
+                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                        sh "docker compose -f docker-compose.ci.yml run --rm android-test"
+                    }
+                }
+            }
+        }
+        stage("SonarQube Analysis") {
+            steps {
+                dir("${PROJECT_DIR}") {
+                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                        withSonarQubeEnv('SonarQube') {
+                            sh '''sonar-scanner \
                               -Dsonar.projectKey=android-app \
-                              -Dsonar.projectName=&quot;Android App&quot; \
+                              -Dsonar.projectName="Android App" \
                               -Dsonar.sources=. \
-                              -Dsonar.exclusions=**/build/**,**/.gradle/**,**/docs/**,**/*.java,**/*.kt \
+                              -Dsonar.exclusions=**/build/**,**/.gradle/**,**/docs/**,**/test/** \
                               -Dsonar.java.binaries=. \
                               -Dsonar.scm.disabled=true \
-                              -Dsonar.coverage.jacoco.xmlReportPaths=&apos;&apos;&apos;
+                              -Dsonar.coverage.jacoco.xmlReportPaths=app/build/reports/coverage/test/debug/report.xml,app/build/reports/coverage/unit/debug/report.xml \
+                              -Dsonar.coverage.exclusions=**/di/**,**/navigation/**,**/theme/**,**/ui/components/**,buildSrc/**,**/ui/screens/**,**/nav/**,**/NavGraph*,**/worker/**,**/MainActivity*,**/MyApplication*,**/ConnectivityManagerNetworkMonitor*,**/NavigationAnalyticsObserver*,**/AnalyticsManager*,**/SyncManager*'''
                         }
                     }
                 }
             }
         }
-        stage(&quot;Verify APK&quot;) {
+        stage("Verify APK") {
             steps {
-                dir(&quot;${PROJECT_DIR}&quot;) {
-                    sh &quot;ls -la app/build/outputs/apk/debug/ || echo &apos;APK directory not found&apos;&quot;
+                dir("${PROJECT_DIR}") {
+                    sh "ls -la app/build/outputs/apk/debug/ || echo 'APK directory not found'"
                 }
             }
         }
     }
     post {
-        success { echo &quot;Android build succeeded: ${PROJECT_NAME}&quot; }
-        failure { echo &quot;Android build FAILED: ${PROJECT_NAME}&quot; }
+        success { echo "Android build succeeded: ${PROJECT_NAME}" }
+        failure { echo "Android build FAILED: ${PROJECT_NAME}" }
         always {
-            dir(&quot;${PROJECT_DIR}&quot;) {
-                sh &quot;docker compose -f docker-compose.ci.yml down --remove-orphans || true&quot;
+            dir("${PROJECT_DIR}") {
+                sh "docker compose -f docker-compose.ci.yml down --remove-orphans || true"
             }
         }
     }

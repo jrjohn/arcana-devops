@@ -1,5 +1,4 @@
-<?xml version='1.1' encoding='UTF-8'?>
-<flow-definition plugin="workflow-job@1571.vb_423c255d6d9">
+<?xml version="1.1" encoding="UTF-8"?><flow-definition plugin="workflow-job@1571.vb_423c255d6d9">
   <actions>
     <org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobAction plugin="pipeline-model-definition@2.2277.v00573e73ddf1"/>
     <org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobPropertyTrackerAction plugin="pipeline-model-definition@2.2277.v00573e73ddf1">
@@ -27,73 +26,172 @@
     <script>pipeline {
     agent any
     triggers {
-        pollSCM(&apos;H/5 * * * *&apos;)
+        pollSCM('H/5 * * * *')
     }
     environment {
-        APP_NAME  = &quot;rust-app&quot;
-        REGISTRY  = &quot;localhost:5000&quot;
-        IMAGE_TAG = &quot;${REGISTRY}/arcana/${APP_NAME}&quot;
-        VERSION   = &quot;1.0.0&quot;
+        APP_NAME  = "rust-app"
+        REGISTRY  = "localhost:5000"
+        IMAGE_TAG = "${REGISTRY}/arcana/${APP_NAME}"
+        VERSION   = "1.0.0"
     }
     stages {
-        stage(&quot;Checkout&quot;) {
+        stage("Checkout") {
             steps {
-                dir(&quot;${env.PROJECTS_DIR}/arcana-cloud-rust&quot;) {
-                    git url: &apos;https://github.com/jrjohn/arcana-cloud-rust.git&apos;,
-                        branch: &apos;main&apos;, credentialsId: &apos;github-credentials&apos;
+                dir("${env.PROJECTS_DIR}/arcana-cloud-rust") {
+                    git url: 'https://github.com/jrjohn/arcana-cloud-rust.git',
+                        branch: 'main', credentialsId: 'github-credentials'
                 }
             }
         }
-        stage(&quot;Docker Compose Build&quot;) {
+                stage("Cleanup Old Images") {
             steps {
-                dir(&quot;${env.PROJECTS_DIR}/arcana-cloud-rust&quot;) {
-                    sh &quot;VERSION=${VERSION} docker compose -f docker-compose.ci.yml build&quot;
-                    sh &quot;docker tag localhost:5000/arcana/${APP_NAME}:${VERSION} ${IMAGE_TAG}:build-${BUILD_NUMBER}&quot;
+                dir("${env.PROJECTS_DIR}/arcana-cloud-rust") {
+                    sh '''
+                        # Remove dangling/unused images to free disk space
+                        docker image prune -f || true
+                        # Keep only last 3 build-tagged images for this app
+                        docker images --format '{{.Repository}}:{{.Tag}}' \
+                            | grep "${APP_NAME}.*build-" \
+                            | sort -t- -k2 -rn \
+                            | tail -n +4 \
+                            | xargs -r docker rmi 2&gt;/dev/null || true
+                        # Stop leftover test containers
+                        docker compose -f docker-compose.test.yml down \
+                            --remove-orphans 2&gt;/dev/null || true
+                    '''
                 }
             }
         }
-        stage(&quot;Unit Tests&quot;) {
+        stage("Docker Compose Build") {
             steps {
-                dir(&quot;${env.PROJECTS_DIR}/arcana-cloud-rust&quot;) {
-                    catchError(buildResult: &apos;SUCCESS&apos;, stageResult: &apos;UNSTABLE&apos;) {
-                        sh &quot;docker compose -f docker-compose.test.yml run --rm --build test&quot;
+                dir("${env.PROJECTS_DIR}/arcana-cloud-rust") {
+                    sh "VERSION=${VERSION} docker compose -f docker-compose.ci.yml build"
+                    sh "docker tag localhost:5000/arcana/${APP_NAME}:${VERSION} ${IMAGE_TAG}:build-${BUILD_NUMBER}"
+                }
+            }
+        }
+        stage("Unit Tests") {
+            steps {
+                dir("${env.PROJECTS_DIR}/arcana-cloud-rust") {
+                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                        sh "docker compose -f docker-compose.test.yml run --rm --build test"
                     }
                 }
             }
         }
-        stage(&quot;SonarQube Analysis&quot;) {
+        stage("Coverage (llvm-cov)") {
             steps {
-                dir(&quot;${env.PROJECTS_DIR}/arcana-cloud-rust&quot;) {
-                    catchError(buildResult: &apos;SUCCESS&apos;, stageResult: &apos;UNSTABLE&apos;) {
-                        withSonarQubeEnv(&apos;SonarQube&apos;) {
-                            sh &apos;&apos;&apos;sonar-scanner \
+                dir("${env.PROJECTS_DIR}/arcana-cloud-rust") {
+                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                        sh "mkdir -p coverage"
+                        sh "docker compose -f docker-compose.coverage.yml build coverage || true"
+                        sh "docker compose -f docker-compose.coverage.yml run --rm coverage || true"
+                        sh '''
+                            if [ -f coverage/lcov.info ]; then
+                                sed -i "s|SF:/app/|SF:$(pwd)/|g" coverage/lcov.info
+                                echo "Fixed LCOV paths: $(head -2 coverage/lcov.info)"
+                                echo "Total SF entries: $(grep -c '^SF:' coverage/lcov.info)"
+                            else
+                                echo "WARNING: coverage/lcov.info not found"
+                            fi
+                        '''
+                    }
+                }
+            }
+        }
+
+        stage("Integration: Layered gRPC") {
+            steps {
+                dir("${env.PROJECTS_DIR}/arcana-cloud-rust") {
+                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                        sh '''
+                            JENKINS_ID=$(hostname)
+                            RUST_IMAGE=placeholder docker compose -p arcana-ci-rust-grpc \
+                                -f deployment/layered/docker-compose-ci-grpc.yml \
+                                down -v --remove-orphans 2&gt;/dev/null || true
+                            RUST_IMAGE=${IMAGE_TAG}:build-${BUILD_NUMBER} \
+                            docker compose -p arcana-ci-rust-grpc \
+                                -f deployment/layered/docker-compose-ci-grpc.yml up -d
+                            docker network connect arcana-ci-rust-net $JENKINS_ID 2&gt;/dev/null || true
+                            bash scripts/integration-smoke-test.sh \
+                                http://arcana-ci-rust-controller:8080 grpc-layered 240
+                            docker network disconnect arcana-ci-rust-net $JENKINS_ID 2&gt;/dev/null || true
+                        '''
+                    }
+                }
+            }
+            post {
+                always {
+                    dir("${env.PROJECTS_DIR}/arcana-cloud-rust") {
+                        sh '''
+                            docker network disconnect arcana-ci-rust-net $(hostname) 2&gt;/dev/null || true
+                            RUST_IMAGE=placeholder docker compose -p arcana-ci-rust-grpc \
+                                -f deployment/layered/docker-compose-ci-grpc.yml \
+                                down -v --remove-orphans 2&gt;/dev/null || true
+                        '''
+                    }
+                }
+            }
+        }
+        stage("Integration: K8s gRPC") {
+            steps {
+                dir("${env.PROJECTS_DIR}/arcana-cloud-rust") {
+                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                        sh '''#!/bin/bash
+                            export PATH="/var/jenkins_home/bin:${PATH}"
+                            kind version || { echo "kind not found"; exit 1; }
+                            bash scripts/kind-smoke-test.sh "${IMAGE_TAG}:build-${BUILD_NUMBER}" grpc 480
+                        '''
+                    }
+                }
+            }
+            post {
+                always {
+                    dir("${env.PROJECTS_DIR}/arcana-cloud-rust") {
+                        sh '''#!/bin/bash
+                            export PATH="/var/jenkins_home/bin:${PATH}"
+                            kind get clusters 2&gt;/dev/null | grep arcana-ci | while read cl; do
+                              kind delete cluster --name "$cl" 2&gt;/dev/null || true
+                            done
+                        '''
+                    }
+                }
+            }
+        }
+                stage("SonarQube Analysis") {
+            steps {
+                dir("${env.PROJECTS_DIR}/arcana-cloud-rust") {
+                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                        withSonarQubeEnv('SonarQube') {
+                            sh '''sonar-scanner \
                               -Dsonar.projectKey=rust-app \
-                              -Dsonar.projectName=&quot;Rust App&quot; \
+                              -Dsonar.projectName="Rust App" \
                               -Dsonar.sources=crates \
-                              -Dsonar.exclusions=target/**,**/target/** \
+                              -Dsonar.exclusions=target/**,**/target/**,**/*.proto \
                               -Dsonar.rust.clippy.enabled=false \
-                              -Dsonar.scm.disabled=true&apos;&apos;&apos;
+                              -Dsonar.scm.disabled=true \
+                              -Dsonar.rust.lcov.reportPaths=coverage/lcov.info'''
                         }
                     }
                 }
             }
         }
-        stage(&quot;Image Info&quot;) {
+        stage("Image Info") {
             steps {
-                sh &quot;docker images --format &apos;table {{.Repository}}:{{.Tag}}\t{{.Size}}&apos; ${IMAGE_TAG}:${VERSION}&quot;
+                sh "docker images --format 'table {{.Repository}}:{{.Tag}}\t{{.Size}}' ${IMAGE_TAG}:${VERSION}"
             }
         }
-        stage(&quot;Push to Registry&quot;) {
+        stage("Push to Registry") {
             steps {
-                sh &quot;docker push ${IMAGE_TAG}:${VERSION}&quot;
-                sh &quot;docker push ${IMAGE_TAG}:build-${BUILD_NUMBER}&quot;
+                sh "docker push ${IMAGE_TAG}:${VERSION}"
+                sh "docker push ${IMAGE_TAG}:build-${BUILD_NUMBER}"
             }
         }
     }
     post {
-        success { echo &quot;Pipeline SUCCESS - ${APP_NAME}:${VERSION}&quot; }
-        failure { echo &quot;Pipeline FAILED&quot; }
-        always  { echo &quot;Build number ${BUILD_NUMBER} done&quot; }
+        success { echo "Pipeline SUCCESS - ${APP_NAME}:${VERSION}" }
+        failure { echo "Pipeline FAILED" }
+        always  { echo "Build number ${BUILD_NUMBER} done" }
     }
 }
 
