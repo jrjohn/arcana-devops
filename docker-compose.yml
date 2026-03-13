@@ -30,7 +30,7 @@ services:
       WINDOWS_USER: "${WINDOWS_USER:-}"
       WINDOWS_REMOTE_FS: "${WINDOWS_REMOTE_FS:-C:\\jenkins-agent}"
       SONARQUBE_TOKEN: "${SONARQUBE_TOKEN:-}"
-      SONAR_HOST_URL: "${SONAR_HOST_URL:-http://sonarqube:9000}"
+      SONAR_HOST_URL: "${SONAR_HOST_URL:-http://sonarqube:9000/sonarqube}"
     group_add:
       - "${DOCKER_GID:-999}"
     healthcheck:
@@ -42,14 +42,15 @@ services:
     restart: unless-stopped
 
   sonarqube:
-    image: sonarqube:lts-community
+    image: sonarqube:26.2.0.119303-community
     container_name: sonarqube
     ports:
-      - "9000:9000"
+      - "127.0.0.1:9000:9000"
     environment:
       SONAR_JDBC_URL: "jdbc:postgresql://sonarqube-db:5432/sonarqube"
       SONAR_JDBC_USERNAME: "${SONAR_DB_USER:-sonarqube}"
       SONAR_JDBC_PASSWORD: "${SONAR_DB_PASSWORD:-sonarqube}"
+      SONAR_WEB_CONTEXT: "/sonarqube"
     volumes:
       - sonarqube_data:/opt/sonarqube/data
       - sonarqube_extensions:/opt/sonarqube/extensions
@@ -82,6 +83,10 @@ services:
     volumes:
       - registry_data:/var/lib/registry
     restart: unless-stopped
+
+  # NOTE: MySQL is managed separately (see your mysql docker-compose).
+  # It joins devops_default via: networks: [devops_default] + external: true
+  # Accessible from Jenkins as: mysql:3306
 
 volumes:
   jenkins_home:
