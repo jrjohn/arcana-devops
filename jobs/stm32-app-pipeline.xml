@@ -1,5 +1,4 @@
-<?xml version='1.1' encoding='UTF-8'?>
-<flow-definition plugin="workflow-job@1571.vb_423c255d6d9">
+<?xml version="1.0" encoding="UTF-8"?><flow-definition plugin="workflow-job@1571.vb_423c255d6d9">
   <actions>
     <org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobAction plugin="pipeline-model-definition@2.2277.v00573e73ddf1"/>
     <org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobPropertyTrackerAction plugin="pipeline-model-definition@2.2277.v00573e73ddf1">
@@ -27,50 +26,75 @@
     <script>pipeline {
     agent any
     triggers {
-        pollSCM(&apos;H/5 * * * *&apos;)
+        pollSCM('H/5 * * * *')
     }
     environment {
-        APP_NAME = &quot;stm32-app&quot;
-        VERSION  = &quot;1.0.0&quot;
+        APP_NAME    = "stm32-app"
+        VERSION     = "1.0.0"
+        PROJECT_DIR = "${env.PROJECTS_DIR}/arcana-embedded-stm32"
+        PROJECT_NAME = "stm32-app"
     }
     stages {
-        stage(&quot;Checkout&quot;) {
+        stage("Checkout") {
             steps {
-                dir(&quot;${env.PROJECTS_DIR}/arcana-embedded-stm32&quot;) {
-                    git url: &apos;https://github.com/jrjohn/arcana-embedded-stm32.git&apos;,
-                        branch: &apos;main&apos;, credentialsId: &apos;github-credentials&apos;
+                dir("${env.PROJECTS_DIR}/arcana-embedded-stm32") {
+                    git url: 'https://github.com/jrjohn/arcana-embedded-stm32.git',
+                        branch: 'main', credentialsId: 'github-credentials'
                 }
             }
         }
-        stage(&quot;Docker Compose Build&quot;) {
+        stage("Firmware Build") {
             steps {
-                dir(&quot;${env.PROJECTS_DIR}/arcana-embedded-stm32&quot;) {
-                    sh &quot;VERSION=${VERSION} docker compose -f docker-compose.ci.yml build&quot;
+                dir("${env.PROJECTS_DIR}/arcana-embedded-stm32") {
+                    sh "VERSION=${VERSION} docker compose -f docker-compose.ci.yml build"
                 }
             }
         }
-        stage(&quot;SonarQube Analysis&quot;) {
+        stage("Unit Tests + Coverage") {
             steps {
-                echo &quot;C requires SonarQube Developer Edition -- skipping analysis&quot;
+                dir("${env.PROJECTS_DIR}/arcana-embedded-stm32") {
+                    sh "docker build -f Dockerfile.test -t stm32-test:ci . 2&gt;&amp;1"
+                    sh "docker create --name stm32-cov stm32-test:ci"
+                    sh "docker cp stm32-cov:/workspace/coverage.info . 2&gt;/dev/null || echo 'No coverage.info generated'"
+                    sh "docker rm stm32-cov || true"
+                    sh "ls -lh coverage.info 2&gt;/dev/null || true"
+                }
             }
         }
-        stage(&quot;Extract Artifacts&quot;) {
+        stage("SonarQube Analysis") {
             steps {
-                sh &quot;docker create --name ${APP_NAME}-out stm32-app-build:${VERSION} 2&gt;/dev/null || true&quot;
-                sh &quot;rm -rf /tmp/${APP_NAME}-firmware &amp;&amp; docker cp ${APP_NAME}-out:/artifacts/ /tmp/${APP_NAME}-firmware/ 2&gt;/dev/null || echo No artifacts dir&quot;
-                sh &quot;docker rm ${APP_NAME}-out 2&gt;/dev/null || true&quot;
-                sh &quot;ls -la /tmp/${APP_NAME}-firmware/ 2&gt;/dev/null || echo No firmware output&quot;
+                dir("${env.PROJECTS_DIR}/arcana-embedded-stm32") {
+                    sh """docker run --rm --network devops_default \
+                        -v \$(pwd):/usr/src \
+                        sonarsource/sonar-scanner-cli:11 \
+                        sonar-scanner \
+                        -Dsonar.host.url=http://sonarqube:9000/sonarqube \
+                        -Dsonar.token=squ_5ce2319b9d8ca2b1db4e0f5bdf36b34249561f18 \
+                        -Dsonar.projectKey=${PROJECT_NAME}"""
+                }
+            }
+        }
+        stage("Extract Artifacts") {
+            steps {
+                sh "docker create --name ${APP_NAME}-out stm32-app-build:${VERSION} 2&gt;/dev/null || true"
+                sh "rm -rf /tmp/${APP_NAME}-firmware &amp;&amp; docker cp ${APP_NAME}-out:/artifacts/ /tmp/${APP_NAME}-firmware/ 2&gt;/dev/null || echo No artifacts dir"
+                sh "docker rm ${APP_NAME}-out 2&gt;/dev/null || true"
+                sh "ls -la /tmp/${APP_NAME}-firmware/ 2&gt;/dev/null || echo No firmware output"
+            }
+        }
+        stage("Cleanup Old Images") {
+            steps {
+                sh "docker image prune -f || true"
+                sh "docker images stm32-test --format '{{.ID}} {{.CreatedAt}}' | sort -r | tail -n +4 | awk '{print \$1}' | xargs docker rmi -f 2&gt;/dev/null || true"
             }
         }
     }
     post {
-        success { echo &quot;Pipeline SUCCESS - ${APP_NAME} firmware built&quot; }
-        failure { echo &quot;Pipeline FAILED&quot; }
-        always  { echo &quot;Build number ${BUILD_NUMBER} done&quot; }
+        success { echo "Pipeline SUCCESS - ${APP_NAME} firmware built + coverage uploaded" }
+        failure { echo "Pipeline FAILED" }
+        always  { echo "Build number ${BUILD_NUMBER} done" }
     }
-}
-
-</script>
+}</script>
     <sandbox>true</sandbox>
   </definition>
   <triggers/>
