@@ -121,10 +121,45 @@
                 }
             }
         }
+        stage("Fastlane CI") {
+            steps {
+                dir("${PROJECT_DIR}") {
+                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                        sh "docker compose -f docker-compose.ci.yml run --rm android-fastlane"
+                    }
+                }
+            }
+        }
+        stage("Build Release APK") {
+            steps {
+                dir("${PROJECT_DIR}") {
+                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                        withCredentials([
+                            file(credentialsId: 'android-keystore', variable: 'KEYSTORE_FILE'),
+                            string(credentialsId: 'android-key-alias', variable: 'KEY_ALIAS'),
+                            string(credentialsId: 'android-key-password', variable: 'KEY_PASSWORD'),
+                            string(credentialsId: 'android-store-password', variable: 'STORE_PASSWORD')
+                        ]) {
+                            sh '''
+                                cp $KEYSTORE_FILE keystore.jks
+                                KEY_ALIAS=$KEY_ALIAS KEY_PASSWORD=$KEY_PASSWORD STORE_PASSWORD=$STORE_PASSWORD \
+                                    docker compose -f docker-compose.ci.yml run --rm android-release
+                                rm -f keystore.jks
+                            '''
+                        }
+                    }
+                }
+            }
+        }
         stage("Verify APK") {
             steps {
                 dir("${PROJECT_DIR}") {
-                    sh "ls -la app/build/outputs/apk/debug/ || echo 'APK directory not found'"
+                    sh """
+                        echo '=== Debug APK ==='
+                        ls -la app/build/outputs/apk/debug/ || echo 'Debug APK not found'
+                        echo '=== Release APK ==='
+                        ls -la app/build/outputs/apk/release/ || echo 'Release APK not found'
+                    """
                 }
             }
         }
