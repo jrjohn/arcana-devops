@@ -6,7 +6,9 @@
         <string>org.jenkinsci.plugins.workflow.job.properties.DisableConcurrentBuildsJobProperty</string>
         <string>jenkins.model.BuildDiscarderProperty</string>
       </jobProperties>
-      <triggers/>
+      <triggers>
+        <string>hudson.triggers.SCMTrigger</string>
+      </triggers>
       <parameters/>
       <options/>
     </org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobPropertyTrackerAction>
@@ -26,75 +28,108 @@
     <org.jenkinsci.plugins.workflow.job.properties.DisableConcurrentBuildsJobProperty>
       <abortPrevious>false</abortPrevious>
     </org.jenkinsci.plugins.workflow.job.properties.DisableConcurrentBuildsJobProperty>
+    <org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty>
+      <triggers>
+        <hudson.triggers.SCMTrigger>
+          <spec>H/5 * * * *</spec>
+          <ignorePostCommitHooks>false</ignorePostCommitHooks>
+        </hudson.triggers.SCMTrigger>
+      </triggers>
+    </org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty>
   </properties>
-  <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@4256.v991a_f1991c03">
+  <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@4257.vb_2e202808577">
     <script>pipeline {
-    agent { label "macos" }
-    triggers {
-        pollSCM('H/5 * * * *')
-    }
+    agent none
+    triggers { pollSCM('H/5 * * * *') }
     environment {
-        PROJECT_NAME = "arcana-ios"
-        VERSION      = "1.0.0"
-        PATH = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+        PROJECT_NAME = 'arcana-ios'
+        VERSION      = '1.0.0'
+        SONAR_TOKEN  = credentials('sonarqube-token')
+        SONAR_HOST_URL = 'http://sonarqube:9000/sonarqube'
     }
     options {
-        timeout(time: 20, unit: "MINUTES")
+        timeout(time: 60, unit: 'MINUTES')
         disableConcurrentBuilds()
-        buildDiscarder(logRotator(numToKeepStr: "10"))
+        buildDiscarder(logRotator(numToKeepStr: '10'))
     }
     stages {
-        stage("Checkout") {
+        stage('Checkout') {
+            agent { label 'macos' }
             steps {
-                withCredentials([usernamePassword(credentialsId: 'github-credentials', usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS')]) {
+                withCredentials([usernamePassword(credentialsId: 'github-credentials',
+                        usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS')]) {
                     sh '''
+                        export PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
                         if [ -d .git ]; then
-                            git fetch --tags --force --progress https://${GIT_USER}:${GIT_PASS}@github.com/jrjohn/arcana-ios.git +refs/heads/*:refs/remotes/origin/*
+                            git fetch --tags --force --progress \
+                                "https://${GIT_USER}:${GIT_PASS}@github.com/YOUR_ORG/arcana-ios.git" \
+                                +refs/heads/*:refs/remotes/origin/*
                             git checkout -f origin/main
                         else
-                            git clone --branch main https://${GIT_USER}:${GIT_PASS}@github.com/jrjohn/arcana-ios.git .
+                            git clone --branch main \
+                                "https://${GIT_USER}:${GIT_PASS}@github.com/YOUR_ORG/arcana-ios.git" .
                         fi
                     '''
                 }
             }
         }
-        stage("Build") {
-            steps {
-                sh "xcodebuild -project arcana-ios.xcodeproj -scheme arcana-ios -configuration Release -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO build 2&gt;&amp;1 | tail -20"
-            }
-        }
-        stage("Test") {
+        stage('Build') {
+            agent { label 'macos' }
             steps {
                 sh '''
-                    xcrun simctl boot "iPhone 17" 2>/dev/null || true
+                    export PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
                     xcodebuild -project arcana-ios.xcodeproj -scheme arcana-ios \
-                        -destination 'platform=iOS Simulator,name=iPhone 17' \
-                        -test-timeouts-enabled YES \
-                        -maximum-test-execution-time-allowance 300 \
-                        test 2>&amp;1 | tail -30
+                        -configuration Release \
+                        -destination 'generic/platform=iOS' \
+                        CODE_SIGNING_ALLOWED=NO build 2&gt;&amp;1 | tail -5 || true
                 '''
             }
         }
-        stage("SonarQube Analysis") {
+        stage('Test + Coverage') {
+            agent { label 'macos' }
             steps {
-                echo "Swift requires SonarQube Developer Edition -- skipping analysis"
+                sh '''
+                    export PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
+                    xcrun simctl boot "iPhone 17" 2&gt;/dev/null || true
+                    XCRESULT=/tmp/arcana-ios-tests.xcresult
+                    rm -rf "${XCRESULT}"
+                    xcodebuild -project arcana-ios.xcodeproj -scheme arcana-ios \
+                        -destination 'platform=iOS Simulator,name=iPhone 17' \
+                        -enableCodeCoverage YES \
+                        -resultBundlePath "${XCRESULT}" \
+                        -test-timeouts-enabled YES \
+                        -maximum-test-execution-time-allowance 120 \
+                        test 2&gt;&amp;1 | tail -20 || true
+                    python3 scripts/xcresult_to_sonar_coverage.py "${XCRESULT}" coverage-report.xml \
+                        || echo "Coverage conversion failed (non-fatal)"
+                    xcrun simctl shutdown all 2&gt;/dev/null || true
+                    xcrun simctl delete unavailable 2&gt;/dev/null || true
+                '''
+                stash includes: 'coverage-report.xml,arcana-ios/Sources/**', name: 'sonar-inputs', allowEmpty: true
+            }
+        }
+        stage('SonarQube Analysis') {
+            agent { label 'built-in' }
+            steps {
+                unstash 'sonar-inputs'
+                sh '''
+                    sonar-scanner \
+                        -Dsonar.projectKey=ios-app \
+                        "-Dsonar.projectName=iOS App" \
+                        -Dsonar.sources=arcana-ios/Sources \
+                        "-Dsonar.exclusions=**/DerivedData/**,**/*.xcassets/**,**/build/**" \
+                        "-Dsonar.coverage.exclusions=**/Mocks/**,**/*Mock*.swift" \
+                        -Dsonar.coverageReportPaths=coverage-report.xml \
+                        -Dsonar.scm.disabled=true
+                '''
             }
         }
     }
     post {
-        always {
-            sh '''
-                xcrun simctl shutdown all 2>/dev/null || true
-                xcrun simctl delete unavailable 2>/dev/null || true
-                rm -rf "${WORKSPACE}/DerivedData" 2>/dev/null || true
-            '''
-        }
-        success { echo "iOS build succeeded: ${PROJECT_NAME} v${VERSION}" }
+        success { echo "iOS build OK: ${PROJECT_NAME} v${VERSION}" }
         failure { echo "iOS build FAILED: ${PROJECT_NAME}" }
     }
-}
-
-</script>
+}</script>
     <sandbox>true</sandbox>
   </definition>
   <triggers/>

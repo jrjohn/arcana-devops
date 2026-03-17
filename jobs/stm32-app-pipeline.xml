@@ -1,45 +1,78 @@
-<?xml version="1.1" encoding="UTF-8"?><flow-definition plugin="workflow-job@1571.vb_423c255d6d9">
+<?xml version="1.0" encoding="UTF-8"?><flow-definition plugin="workflow-job@1571.vb_423c255d6d9">
   <actions>
     <org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobAction plugin="pipeline-model-definition@2.2277.v00573e73ddf1"/>
     <org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobPropertyTrackerAction plugin="pipeline-model-definition@2.2277.v00573e73ddf1">
       <jobProperties/>
-      <triggers/>
+      <triggers>
+        <string>hudson.triggers.SCMTrigger</string>
+      </triggers>
       <parameters/>
       <options/>
     </org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobPropertyTrackerAction>
   </actions>
   <description>STM32 Pipeline (compose)</description>
   <keepDependencies>false</keepDependencies>
-  <properties/>
-  <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@4256.v991a_f1991c03">
+  <properties>
+    <org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty>
+      <triggers>
+        <hudson.triggers.SCMTrigger>
+          <spec>H/5 * * * *</spec>
+          <ignorePostCommitHooks>false</ignorePostCommitHooks>
+        </hudson.triggers.SCMTrigger>
+      </triggers>
+    </org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty>
+  </properties>
+  <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@4257.vb_2e202808577">
     <script>pipeline {
     agent any
     triggers {
         pollSCM('H/5 * * * *')
     }
     environment {
-        APP_NAME = "stm32-app"
-        VERSION  = "1.0.0"
+        APP_NAME    = "stm32-app"
+        VERSION     = "1.0.0"
+        PROJECT_DIR = "${env.PROJECTS_DIR}/arcana-embedded-stm32"
+        PROJECT_NAME = "stm32-app"
     }
     stages {
         stage("Checkout") {
             steps {
                 dir("${env.PROJECTS_DIR}/arcana-embedded-stm32") {
-                    git url: 'https://github.com/jrjohn/arcana-embedded-stm32.git',
+                    git url: 'https://github.com/YOUR_ORG/arcana-embedded-stm32.git',
                         branch: 'main', credentialsId: 'github-credentials'
                 }
             }
         }
-        stage("Docker Compose Build") {
+        stage("Firmware Build") {
             steps {
                 dir("${env.PROJECTS_DIR}/arcana-embedded-stm32") {
                     sh "VERSION=${VERSION} docker compose -f docker-compose.ci.yml build"
                 }
             }
         }
+        stage("Unit Tests + Coverage") {
+            steps {
+                dir("${env.PROJECTS_DIR}/arcana-embedded-stm32") {
+                    sh "docker build -f Dockerfile.test -t stm32-test:ci . 2&gt;&amp;1"
+                    sh "docker create --name stm32-cov stm32-test:ci"
+                    sh "docker cp stm32-cov:/workspace/coverage.info . 2&gt;/dev/null || echo 'No coverage.info'"
+                    sh "docker cp stm32-cov:/workspace/coverage.xml  . 2&gt;/dev/null || echo 'No coverage.xml'"
+                    sh "docker rm stm32-cov || true"
+                    sh "ls -lh coverage.info 2&gt;/dev/null || true"
+                }
+            }
+        }
         stage("SonarQube Analysis") {
             steps {
-                echo "C requires SonarQube Developer Edition -- skipping analysis"
+                dir("${env.PROJECTS_DIR}/arcana-embedded-stm32") {
+                    sh """docker run --rm --network devops_default \
+                        -v \$(pwd):/usr/src \
+                        sonarsource/sonar-scanner-cli:11 \
+                        sonar-scanner \
+                        -Dsonar.host.url=http://sonarqube:9000/sonarqube \
+                        -Dsonar.token=${SONAR_TOKEN} \
+                        -Dsonar.projectKey=${PROJECT_NAME}"""
+                }
             }
         }
         stage("Extract Artifacts") {
@@ -50,15 +83,19 @@
                 sh "ls -la /tmp/${APP_NAME}-firmware/ 2&gt;/dev/null || echo No firmware output"
             }
         }
+        stage("Cleanup Old Images") {
+            steps {
+                sh "docker image prune -f || true"
+                sh "docker images stm32-test --format '{{.ID}} {{.CreatedAt}}' | sort -r | tail -n +4 | awk '{print \$1}' | xargs docker rmi -f 2&gt;/dev/null || true"
+            }
+        }
     }
     post {
-        success { echo "Pipeline SUCCESS - ${APP_NAME} firmware built" }
+        success { echo "Pipeline SUCCESS - ${APP_NAME} firmware built + coverage uploaded" }
         failure { echo "Pipeline FAILED" }
         always  { echo "Build number ${BUILD_NUMBER} done" }
     }
-}
-
-</script>
+}</script>
     <sandbox>true</sandbox>
   </definition>
   <triggers/>

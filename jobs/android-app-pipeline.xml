@@ -6,7 +6,9 @@
         <string>org.jenkinsci.plugins.workflow.job.properties.DisableConcurrentBuildsJobProperty</string>
         <string>jenkins.model.BuildDiscarderProperty</string>
       </jobProperties>
-      <triggers/>
+      <triggers>
+        <string>hudson.triggers.SCMTrigger</string>
+      </triggers>
       <parameters/>
       <options/>
     </org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobPropertyTrackerAction>
@@ -25,8 +27,16 @@
     <org.jenkinsci.plugins.workflow.job.properties.DisableConcurrentBuildsJobProperty>
       <abortPrevious>false</abortPrevious>
     </org.jenkinsci.plugins.workflow.job.properties.DisableConcurrentBuildsJobProperty>
+    <org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty>
+      <triggers>
+        <hudson.triggers.SCMTrigger>
+          <spec>H/5 * * * *</spec>
+          <ignorePostCommitHooks>false</ignorePostCommitHooks>
+        </hudson.triggers.SCMTrigger>
+      </triggers>
+    </org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty>
   </properties>
-  <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@4256.v991a_f1991c03">
+  <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@4257.vb_2e202808577">
     <script>pipeline {
     agent any
     triggers {
@@ -37,7 +47,7 @@
         PROJECT_DIR  = "${env.PROJECTS_DIR}/arcana-android"
     }
     options {
-        timeout(time: 90, unit: "MINUTES")
+        timeout(time: 150, unit: "MINUTES")
         disableConcurrentBuilds()
         buildDiscarder(logRotator(numToKeepStr: "10"))
     }
@@ -45,8 +55,27 @@
         stage("Checkout") {
             steps {
                 dir("${env.PROJECTS_DIR}/arcana-android") {
-                    git url: 'https://github.com/jrjohn/arcana-android.git',
+                    git url: 'https://github.com/YOUR_ORG/arcana-android.git',
                         branch: 'main', credentialsId: 'github-credentials'
+                }
+            }
+        }
+                stage("Cleanup Old Images") {
+            steps {
+                dir("${env.PROJECTS_DIR}/arcana-android") {
+                    sh '''
+                        # Remove dangling/unused images to free disk space
+                        docker image prune -f || true
+                        # Keep only last 3 build-tagged images for this app
+                        docker images --format '{{.Repository}}:{{.Tag}}' \
+                            | grep "${APP_NAME}.*build-" \
+                            | sort -t- -k2 -rn \
+                            | tail -n +4 \
+                            | xargs -r docker rmi 2&gt;/dev/null || true
+                        # Stop leftover test containers
+                        docker compose -f docker-compose.test.yml down \
+                            --remove-orphans 2&gt;/dev/null || true
+                    '''
                 }
             }
         }
@@ -64,6 +93,15 @@
                 }
             }
         }
+        stage("Unit Tests with Coverage") {
+            steps {
+                dir("${PROJECT_DIR}") {
+                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                        sh "docker compose -f docker-compose.ci.yml run --rm android-test"
+                    }
+                }
+            }
+        }
         stage("SonarQube Analysis") {
             steps {
                 dir("${PROJECT_DIR}") {
@@ -73,10 +111,81 @@
                               -Dsonar.projectKey=android-app \
                               -Dsonar.projectName="Android App" \
                               -Dsonar.sources=. \
-                              -Dsonar.exclusions=**/build/**,**/.gradle/**,**/docs/**,**/*.java,**/*.kt \
+                              -Dsonar.exclusions=**/build/**,**/.gradle/**,**/docs/**,**/test/** \
                               -Dsonar.java.binaries=. \
                               -Dsonar.scm.disabled=true \
-                              -Dsonar.coverage.jacoco.xmlReportPaths='''
+                              -Dsonar.coverage.jacoco.xmlReportPaths=app/build/reports/coverage/test/debug/report.xml,app/build/reports/coverage/unit/debug/report.xml \
+                              -Dsonar.coverage.exclusions=**/di/**,**/navigation/**,**/theme/**,**/ui/components/**,buildSrc/**,**/ui/screens/**,**/nav/**,**/NavGraph*,**/worker/**,**/MainActivity*,**/MyApplication*,**/ConnectivityManagerNetworkMonitor*,**/NavigationAnalyticsObserver*,**/AnalyticsManager*,**/SyncManager*'''
+                        }
+                    }
+                }
+            }
+        }
+        stage("Fastlane CI") {
+            steps {
+                dir("${PROJECT_DIR}") {
+                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                        sh "docker compose -f docker-compose.ci.yml run --rm android-fastlane"
+                    }
+                }
+            }
+        }
+        stage("Build Release AAB") {
+            steps {
+                dir("${PROJECT_DIR}") {
+                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                        withCredentials([
+                            file(credentialsId: 'android-keystore', variable: 'KEYSTORE_FILE'),
+                            string(credentialsId: 'android-key-alias', variable: 'KEY_ALIAS'),
+                            string(credentialsId: 'android-key-password', variable: 'KEY_PASSWORD'),
+                            string(credentialsId: 'android-store-password', variable: 'STORE_PASSWORD')
+                        ]) {
+                            sh '''
+                                KEYSTORE_B64=$(base64 -w 0 $KEYSTORE_FILE)
+                                docker run --rm \
+                                    -v ${PROJECT_DIR}:/project \
+                                    -v arcana-android_gradle-cache:/root/.gradle \
+                                    -e KEYSTORE_B64="$KEYSTORE_B64" \
+                                    -e KEY_ALIAS=$KEY_ALIAS \
+                                    -e KEY_PASSWORD=$KEY_PASSWORD \
+                                    -e STORE_PASSWORD=$STORE_PASSWORD \
+                                    localhost:5000/arcana/android-app:1.0.0 \
+                                    bash -c 'echo "$KEYSTORE_B64" | base64 -d &gt; /tmp/arcana.keystore &amp;&amp; KEYSTORE_FILE=/tmp/arcana.keystore bundle exec fastlane bundle_release'
+                            '''
+                        }
+                    }
+                }
+            }
+            post {
+                success {
+                    dir('/data/projects/arcana-android') {
+                        archiveArtifacts artifacts: 'app/build/outputs/bundle/release/*.aab, app/build/outputs/mapping/release/mapping.txt', allowEmptyArchive: true
+                    }
+                }
+            }
+        }
+        stage("Build Release APK") {
+            steps {
+                dir("${PROJECT_DIR}") {
+                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                        withCredentials([
+                            file(credentialsId: 'android-keystore', variable: 'KEYSTORE_FILE'),
+                            string(credentialsId: 'android-key-alias', variable: 'KEY_ALIAS'),
+                            string(credentialsId: 'android-key-password', variable: 'KEY_PASSWORD'),
+                            string(credentialsId: 'android-store-password', variable: 'STORE_PASSWORD')
+                        ]) {
+                            sh '''
+                                KEYSTORE_B64=$(base64 -w 0 $KEYSTORE_FILE)
+                                docker run --rm \
+                                    -v ${PROJECT_DIR}:/project \
+                                    -v arcana-android_gradle-cache:/root/.gradle \
+                                    -e KEYSTORE_B64="$KEYSTORE_B64" \
+                                    -e KEY_ALIAS=$KEY_ALIAS \
+                                    -e KEY_PASSWORD=$KEY_PASSWORD \
+                                    -e STORE_PASSWORD=$STORE_PASSWORD \
+                                    localhost:5000/arcana/android-app:1.0.0 \
+                                    bash -c 'echo "$KEYSTORE_B64" | base64 -d &gt; /tmp/arcana.keystore &amp;&amp; KEYSTORE_FILE=/tmp/arcana.keystore bundle exec fastlane build_release'
+                            '''
                         }
                     }
                 }
@@ -85,7 +194,12 @@
         stage("Verify APK") {
             steps {
                 dir("${PROJECT_DIR}") {
-                    sh "ls -la app/build/outputs/apk/debug/ || echo 'APK directory not found'"
+                    sh """
+                        echo '=== Debug APK ==='
+                        ls -la app/build/outputs/apk/debug/ || echo 'Debug APK not found'
+                        echo '=== Release APK ==='
+                        ls -la app/build/outputs/apk/release/ || echo 'Release APK not found'
+                    """
                 }
             }
         }
