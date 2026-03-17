@@ -141,10 +141,16 @@
                             string(credentialsId: 'android-store-password', variable: 'STORE_PASSWORD')
                         ]) {
                             sh '''
-                                cp $KEYSTORE_FILE keystore.jks
-                                KEY_ALIAS=$KEY_ALIAS KEY_PASSWORD=$KEY_PASSWORD STORE_PASSWORD=$STORE_PASSWORD \
-                                    docker compose -f docker-compose.ci.yml run --rm android-aab
-                                rm -f keystore.jks
+                                KEYSTORE_B64=$(base64 -w 0 $KEYSTORE_FILE)
+                                docker run --rm \
+                                    -v ${PROJECT_DIR}:/project \
+                                    -v arcana-android_gradle-cache:/root/.gradle \
+                                    -e KEYSTORE_B64="$KEYSTORE_B64" \
+                                    -e KEY_ALIAS=$KEY_ALIAS \
+                                    -e KEY_PASSWORD=$KEY_PASSWORD \
+                                    -e STORE_PASSWORD=$STORE_PASSWORD \
+                                    localhost:5000/arcana/android-app:1.0.0 \
+                                    bash -c 'echo "$KEYSTORE_B64" | base64 -d > /tmp/arcana.keystore &amp;&amp; KEYSTORE_FILE=/tmp/arcana.keystore bundle exec fastlane bundle_release'
                             '''
                         }
                     }
@@ -152,7 +158,9 @@
             }
             post {
                 success {
-                    archiveArtifacts artifacts: '**/build/outputs/bundle/release/*.aab', allowEmptyArchive: true
+                    dir('/data/projects/arcana-android') {
+                        archiveArtifacts artifacts: 'app/build/outputs/bundle/release/*.aab, app/build/outputs/mapping/release/mapping.txt', allowEmptyArchive: true
+                    }
                 }
             }
         }
@@ -167,10 +175,16 @@
                             string(credentialsId: 'android-store-password', variable: 'STORE_PASSWORD')
                         ]) {
                             sh '''
-                                cp $KEYSTORE_FILE keystore.jks
-                                KEY_ALIAS=$KEY_ALIAS KEY_PASSWORD=$KEY_PASSWORD STORE_PASSWORD=$STORE_PASSWORD \
-                                    docker compose -f docker-compose.ci.yml run --rm android-release
-                                rm -f keystore.jks
+                                KEYSTORE_B64=$(base64 -w 0 $KEYSTORE_FILE)
+                                docker run --rm \
+                                    -v ${PROJECT_DIR}:/project \
+                                    -v arcana-android_gradle-cache:/root/.gradle \
+                                    -e KEYSTORE_B64="$KEYSTORE_B64" \
+                                    -e KEY_ALIAS=$KEY_ALIAS \
+                                    -e KEY_PASSWORD=$KEY_PASSWORD \
+                                    -e STORE_PASSWORD=$STORE_PASSWORD \
+                                    localhost:5000/arcana/android-app:1.0.0 \
+                                    bash -c 'echo "$KEYSTORE_B64" | base64 -d > /tmp/arcana.keystore &amp;&amp; KEYSTORE_FILE=/tmp/arcana.keystore bundle exec fastlane build_release'
                             '''
                         }
                     }
