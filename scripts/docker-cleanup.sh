@@ -1,7 +1,7 @@
 #!/bin/bash
 # Docker Cleanup Script — daily cleanup of images, registry, cache, volumes
 # Cron: 0 3 * * * /data/devops/scripts/docker-cleanup.sh
-LOG="/var/log/docker-cleanup.log"
+LOG="/data/devops/logs/docker-cleanup.log"
 REGISTRY="http://localhost:5000"
 ACCEPT="Accept: application/vnd.oci.image.index.v1+json"
 KEEP_BUILDS=3
