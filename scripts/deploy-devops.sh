@@ -75,6 +75,10 @@ docker compose build jenkins
 log "Starting core services (Jenkins + SonarQube)..."
 docker compose up -d
 
+# ── Start Nexus Repository Manager ────────────
+log "Starting Nexus Repository Manager..."
+docker compose -f docker-compose.nexus.yml up -d
+
 # ── Start monitoring stack ────────────────────
 log "Starting monitoring stack..."
 docker compose -f docker-compose.monitoring.yml up -d --build
@@ -142,6 +146,23 @@ for i in $(seq 1 15); do
     sleep 3
 done
 
+echo -n "  Nexus: "
+for i in $(seq 1 60); do
+    if curl -sf http://127.0.0.1:8081/nexus/service/rest/v1/status &>/dev/null; then
+        echo -e "${GREEN}UP${NC}"
+        break
+    fi
+    [ "$i" -eq 60 ] && echo -e "${RED}TIMEOUT${NC}"
+    sleep 5
+done
+
+# ── Auto-configure Nexus repositories ─────────
+if curl -sf http://127.0.0.1:8081/nexus/service/rest/v1/status &>/dev/null; then
+    NEXUS_PASS="${NEXUS_ADMIN_PASSWORD:-admin123}"
+    log "Setting up Nexus proxy repositories..."
+    "$SCRIPT_DIR/setup-nexus-repos.sh" "http://127.0.0.1:8081/nexus" "$NEXUS_PASS"
+fi
+
 # ── Auto-configure SonarQube tokens ───────────
 NEED_RESTART=false
 if grep -q '^SONARQUBE_TOKEN=$' "$PROJECT_DIR/.env" 2>/dev/null; then
@@ -183,6 +204,7 @@ log ""
 log "Service URLs:"
 log "  Jenkins:    https://arcana.boo/jenkins/"
 log "  SonarQube:  https://arcana.boo/sonarqube/"
+log "  Nexus:      https://arcana.boo/nexus/"
 log "  Grafana:    https://arcana.boo/grafana/"
 log "  Prometheus: https://arcana.boo/prometheus/"
 log ""
@@ -191,4 +213,4 @@ log "  1. Manually trigger all 15 pipelines once (primes SCM polling)"
 log "  2. Set up JNLP agents on Mac Mini and Windows:"
 log "     Mac:     scripts/setup-jnlp-agent-mac.sh"
 log "     Windows: scripts/setup-jnlp-agent-windows.ps1"
-log "  3. Verify at: docker ps  (expect ~12 containers)"
+log "  3. Verify at: docker ps  (expect ~13 containers)"
