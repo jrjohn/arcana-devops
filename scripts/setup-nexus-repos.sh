@@ -481,6 +481,87 @@ create_repo "google-maven-proxy" "maven" '{
   }
 }'
 
+# ── Ubuntu APT proxy ─────────────────────────
+create_repo "ubuntu-ports-proxy" "apt" '{
+  "name": "ubuntu-ports-proxy",
+  "online": true,
+  "storage": {
+    "blobStoreName": "default",
+    "strictContentTypeValidation": true
+  },
+  "proxy": {
+    "remoteUrl": "http://ports.ubuntu.com/ubuntu-ports",
+    "contentMaxAge": 1440,
+    "metadataMaxAge": 60
+  },
+  "httpClient": {
+    "blocked": false,
+    "autoBlock": true
+  },
+  "negativeCache": {
+    "enabled": true,
+    "timeToLive": 1440
+  },
+  "apt": {
+    "distribution": "noble",
+    "flat": false
+  }
+}'
+
+# ── Debian APT proxy ────────────────────────
+create_repo "debian-proxy" "apt" '{
+  "name": "debian-proxy",
+  "online": true,
+  "storage": {
+    "blobStoreName": "default",
+    "strictContentTypeValidation": true
+  },
+  "proxy": {
+    "remoteUrl": "http://deb.debian.org/debian",
+    "contentMaxAge": 1440,
+    "metadataMaxAge": 60
+  },
+  "httpClient": {
+    "blocked": false,
+    "autoBlock": true
+  },
+  "negativeCache": {
+    "enabled": true,
+    "timeToLive": 1440
+  },
+  "apt": {
+    "distribution": "trixie",
+    "flat": false
+  }
+}'
+
+# ── Debian Security APT proxy ───────────────
+create_repo "debian-security-proxy" "apt" '{
+  "name": "debian-security-proxy",
+  "online": true,
+  "storage": {
+    "blobStoreName": "default",
+    "strictContentTypeValidation": true
+  },
+  "proxy": {
+    "remoteUrl": "http://deb.debian.org/debian-security",
+    "contentMaxAge": 1440,
+    "metadataMaxAge": 60
+  },
+  "httpClient": {
+    "blocked": false,
+    "autoBlock": true
+  },
+  "negativeCache": {
+    "enabled": true,
+    "timeToLive": 1440
+  },
+  "apt": {
+    "distribution": "trixie-security",
+    "flat": false
+  }
+}'
+
 # ── Summary ───────────────────────────────────
 log ""
 log "Repository setup complete!"
@@ -500,6 +581,9 @@ log "  go-proxy                → https://proxy.golang.org"
 log "  gradle-dist-proxy       → https://services.gradle.org/distributions/"
 log "  gradle-plugins-proxy    → https://plugins.gradle.org/m2/"
 log "  google-maven-proxy      → https://dl.google.com/dl/android/maven2/"
+log "  ubuntu-ports-proxy      → http://ports.ubuntu.com/ubuntu-ports"
+log "  debian-proxy            → http://deb.debian.org/debian"
+log "  debian-security-proxy   → http://deb.debian.org/debian-security"
 log ""
 log "Usage examples:"
 log "  npm:      npm config set registry http://172.17.0.1:8081/nexus/repository/npm-proxy/"
