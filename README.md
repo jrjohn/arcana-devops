@@ -410,19 +410,19 @@ SonarQube 26.2.0 Community Build analyzes 14 of 15 projects automatically on eve
 |---------|-----|-----------|------|-------|--------|-----|----------|
 | go-app | 14,554 | Go, Docker, YAML | 0 | 0 | 0 | 1.0% | 88.6% |
 | rust-app | 22,414 | Rust | 0 | 0 | 0 | 6.9% | 80.4% |
-| vue-app | 6,790 | TS, JS, CSS | 7 | 0 | 92 | 1.5% | 92.3% |
+| vue-app | 6,797 | TS, JS, CSS | 0 | 0 | 0 | 1.5% | 92.3% |
 | dotnet-app | 9,785 | C#, Docker | 0 | 0 | 0 | 0.2% | 80.3% |
 | springboot-app | 7,928 | Java, JS, XML | 0 | 0 | 0 | 0.9% | 82.1% |
 | python-app | 12,443 | Python, Docker, YAML | 0 | 1 | 0 | 0.8% | 80.1% |
 | node-app | 5,073 | TypeScript | 0 | 0 | 0 | 1.7% | 77.4% |
-| react-app | 10,402 | TypeScript, CSS | 11 | 0 | 105 | 1.9% | 31.4% |
+| react-app | 10,399 | TypeScript, CSS | 0 | 0 | 0 | 1.9% | 31.2% |
 | angular-app | 8,203 | TS, CSS, HTML | 0 | 0 | 0 | 7.7% | 81.3% |
 | android-app | 8,608 | Kotlin, XML | 0 | 0 | 3 | 1.6% | 82.7% |
 | ios-app | 5,780 | Swift | 0 | 0 | 0 | 1.6% | 89.4% |
 | stm32-app | 3,758 | C++ (sonar-cxx) | 0 | 0 | 0 | 1.7% | 18.2% |
 | harmonyos-app | 2,339 | JavaScript | 0 | 0 | 0 | 0.0% | 87.2% |
 
-**Total LOC analyzed: 118,077** across 14 projects. **11/14 projects have zero bugs and zero code smells.** Coverage tracked for all projects (avg ~75%).
+**Total LOC analyzed: 118,077** across 14 projects. **12/14 projects have zero bugs, zero vulnerabilities, and zero code smells.** Coverage tracked for all projects (avg ~75%). Only python-app has 1 vulnerability and android-app has 3 code smells remaining.
 
 ### Not Analyzed (1 pipeline)
 
