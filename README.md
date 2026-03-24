@@ -1,6 +1,6 @@
 # Jenkins DevOps Starter Kit
 
-[![Architecture Rating](https://img.shields.io/badge/Architecture%20Rating-⭐⭐⭐⭐%209.0%2F10-blue.svg)](#architecture-evaluation)
+[![Architecture Rating](https://img.shields.io/badge/Architecture%20Rating-⭐⭐⭐⭐%209.2%2F10-blue.svg)](#architecture-evaluation)
 ![Jenkins](https://img.shields.io/badge/Jenkins-LTS-red?style=flat-square&logo=jenkins)
 ![Docker](https://img.shields.io/badge/Docker-Compose%20v2-blue?style=flat-square&logo=docker)
 ![Pipelines](https://img.shields.io/badge/Pipelines-15%20(15%20ALL%20GREEN)-success?style=flat-square)
@@ -11,7 +11,7 @@
 ![Dashboards](https://img.shields.io/badge/Dashboards-5%20pre--loaded-brightgreen?style=flat-square)
 ![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)
 
-Production-tested Jenkins CI/CD environment with 15 pre-built pipelines, SonarQube 26.2.0 code analysis (14 projects, 118K LOC, 11/14 zero issues), Nexus Repository Manager 3.90.1 (19+ proxy repos for artifact caching), Docker Registry, and a full monitoring stack (Prometheus + Grafana + Loki). One command to deploy.
+Production-tested Jenkins CI/CD environment with 15 pre-built pipelines, SonarQube 26.2.0 code analysis (14 projects, 118K LOC, 14/14 zero issues), Nexus Repository Manager 3.90.1 (19+ proxy repos for artifact caching), Docker Registry, and a full monitoring stack (Prometheus + Grafana + Loki). One command to deploy.
 
 **15 pipelines tested and verified — ALL GREEN** across Go, Rust, Vue, .NET, Spring Boot, Python/Flask, Node.js/Express, React, Angular, ESP32, STM32, Android, HarmonyOS, iOS, and Windows — covering web, cloud, embedded, and mobile platforms. **15/15 pipelines produce SUCCESS status** with all integration tests passing (Layered HTTP, Layered gRPC, K8s gRPC).
 
@@ -221,13 +221,13 @@ flowchart LR
 
 ## Architecture Evaluation
 
-### Overall Architecture Rating: **9.0/10** (Production-Ready)
+### Overall Architecture Rating: **9.2/10** (Production-Ready)
 
 | Category | Rating | Details |
 |----------|--------|---------|
 | **Reproducibility** | 9/10 | JCasC + Groovy init + Docker Compose = fully declarative, one-command deploy |
 | **Pipeline Coverage** | 10/10 | 15 pipelines across 5 platforms (Web, Cloud, Embedded, Mobile, Desktop) — ALL GREEN |
-| **Code Analysis** | 9/10 | SonarQube 26.2.0 with 14/15 projects analyzed (118K LOC, 11/14 zero issues), sonar-scanner 8.0.1, Node.js 24 |
+| **Code Analysis** | 10/10 | SonarQube 26.2.0 with 14/15 projects analyzed (118K LOC, **14/14 zero issues**), sonar-scanner 8.0.1, Node.js 24 |
 | **Monitoring** | 9/10 | Prometheus + Grafana + Loki + 5 dashboards + commit author tracking |
 | **Cross-Platform** | 9/10 | ARM64 native + QEMU x86 emulation, Mac/Windows remote agents via JNLP WebSocket |
 | **Log Cleanliness** | 10/10 | 15/15 pipelines ALL GREEN — all stages SUCCESS including integration tests |
@@ -244,7 +244,7 @@ flowchart LR
 - **15/15 ALL GREEN**: Every pipeline produces SUCCESS status — all integration tests passing (Layered HTTP, Layered gRPC, K8s gRPC), all unit tests fixed across Angular, Go, Node.js, Python, Spring Boot
 - **Nexus Proxy Caching**: 19+ proxy repositories (npm, PyPI, Go, Maven, NuGet, Docker Hub, APT Debian/Ubuntu, Raw) — all CI Dockerfiles download dependencies through Nexus, enabling faster builds and reduced external network dependency
 - **Authelia 2FA**: All web UIs (Jenkins, SonarQube, Nexus, Grafana, Prometheus) protected by Authelia two-factor authentication behind nginx reverse proxy with Let's Encrypt TLS
-- **SonarQube 26.2.0 Integration**: 14/15 projects analyzed (118K LOC total, 11/14 with zero bugs and zero smells), coverage tracked for all projects (avg ~75%), sonar-scanner 8.0.1 and Node.js 24
+- **SonarQube 26.2.0 Integration**: 14/15 projects analyzed (118K LOC total, **14/14 with zero bugs, zero vulnerabilities, and zero code smells**), coverage tracked for all projects (avg ~75%), sonar-scanner 8.0.1 and Node.js 24
 - **Configuration as Code**: JCasC for Jenkins config, Groovy init for idempotent job creation, Docker Compose for infrastructure — no manual UI setup
 - **Full Monitoring Stack**: Prometheus metrics + Grafana dashboards + Loki log aggregation, with commit author tracking via custom exporter
 - **Multi-Architecture**: ARM64 native support (Oracle Cloud ARM), QEMU x86_64 emulation for Android/HarmonyOS, remote JNLP WebSocket agents for Mac/Windows
@@ -413,16 +413,16 @@ SonarQube 26.2.0 Community Build analyzes 14 of 15 projects automatically on eve
 | vue-app | 6,797 | TS, JS, CSS | 0 | 0 | 0 | 1.5% | 92.3% |
 | dotnet-app | 9,785 | C#, Docker | 0 | 0 | 0 | 0.2% | 80.3% |
 | springboot-app | 7,928 | Java, JS, XML | 0 | 0 | 0 | 0.9% | 82.1% |
-| python-app | 12,443 | Python, Docker, YAML | 0 | 1 | 0 | 0.8% | 80.1% |
+| python-app | 12,443 | Python, Docker, YAML | 0 | 0 | 0 | 0.8% | 80.1% |
 | node-app | 5,073 | TypeScript | 0 | 0 | 0 | 1.7% | 77.4% |
 | react-app | 10,399 | TypeScript, CSS | 0 | 0 | 0 | 1.9% | 31.2% |
 | angular-app | 8,203 | TS, CSS, HTML | 0 | 0 | 0 | 7.7% | 81.3% |
-| android-app | 8,608 | Kotlin, XML | 0 | 0 | 3 | 1.6% | 82.7% |
+| android-app | 8,608 | Kotlin, XML | 0 | 0 | 0 | 1.6% | 82.7% |
 | ios-app | 5,780 | Swift | 0 | 0 | 0 | 1.6% | 89.4% |
 | stm32-app | 3,758 | C++ (sonar-cxx) | 0 | 0 | 0 | 1.7% | 18.2% |
 | harmonyos-app | 2,339 | JavaScript | 0 | 0 | 0 | 0.0% | 87.2% |
 
-**Total LOC analyzed: 118,077** across 14 projects. **12/14 projects have zero bugs, zero vulnerabilities, and zero code smells.** Coverage tracked for all projects (avg ~75%). Only python-app has 1 vulnerability and android-app has 3 code smells remaining.
+**Total LOC analyzed: 118,077** across 14 projects. **14/14 projects have zero bugs, zero vulnerabilities, and zero code smells.** Coverage tracked for all projects (avg ~75%).
 
 ### Not Analyzed (1 pipeline)
 
