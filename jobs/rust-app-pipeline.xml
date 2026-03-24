@@ -3,26 +3,15 @@
     <org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobAction plugin="pipeline-model-definition@2.2277.v00573e73ddf1"/>
     <org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobPropertyTrackerAction plugin="pipeline-model-definition@2.2277.v00573e73ddf1">
       <jobProperties/>
-      <triggers>
-        <string>hudson.triggers.SCMTrigger</string>
-      </triggers>
+      <triggers/>
       <parameters/>
       <options/>
     </org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobPropertyTrackerAction>
   </actions>
   <description>Rust Pipeline (compose)</description>
   <keepDependencies>false</keepDependencies>
-  <properties>
-    <org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty>
-      <triggers>
-        <hudson.triggers.SCMTrigger>
-          <spec>H/5 * * * *</spec>
-          <ignorePostCommitHooks>false</ignorePostCommitHooks>
-        </hudson.triggers.SCMTrigger>
-      </triggers>
-    </org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty>
-  </properties>
-  <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@4257.vb_2e202808577">
+  <properties/>
+  <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@4256.v991a_f1991c03">
     <script>pipeline {
     agent any
     triggers {
@@ -38,27 +27,8 @@
         stage("Checkout") {
             steps {
                 dir("${env.PROJECTS_DIR}/arcana-cloud-rust") {
-                    git url: 'https://github.com/jrjohn/arcana-cloud-rust.git',
+                    git url: 'https://github.com/YOUR_ORG/arcana-cloud-rust.git',
                         branch: 'main', credentialsId: 'github-credentials'
-                }
-            }
-        }
-                stage("Cleanup Old Images") {
-            steps {
-                dir("${env.PROJECTS_DIR}/arcana-cloud-rust") {
-                    sh '''
-                        # Remove dangling/unused images to free disk space
-                        docker image prune -f || true
-                        # Keep only last 3 build-tagged images for this app
-                        docker images --format '{{.Repository}}:{{.Tag}}' \
-                            | grep "${APP_NAME}.*build-" \
-                            | sort -t- -k2 -rn \
-                            | tail -n +4 \
-                            | xargs -r docker rmi 2&gt;/dev/null || true
-                        # Stop leftover test containers
-                        docker compose -f docker-compose.test.yml down \
-                            --remove-orphans 2&gt;/dev/null || true
-                    '''
                 }
             }
         }
@@ -79,86 +49,7 @@
                 }
             }
         }
-        stage("Coverage (llvm-cov)") {
-            steps {
-                dir("${env.PROJECTS_DIR}/arcana-cloud-rust") {
-                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                        sh "mkdir -p coverage"
-                        sh "docker compose -f docker-compose.coverage.yml build coverage || true"
-                        sh "docker compose -f docker-compose.coverage.yml run --rm coverage || true"
-                        sh '''
-                            if [ -f coverage/lcov.info ]; then
-                                sed -i "s|SF:/app/|SF:$(pwd)/|g" coverage/lcov.info
-                                echo "Fixed LCOV paths: $(head -2 coverage/lcov.info)"
-                                echo "Total SF entries: $(grep -c '^SF:' coverage/lcov.info)"
-                            else
-                                echo "WARNING: coverage/lcov.info not found"
-                            fi
-                        '''
-                    }
-                }
-            }
-        }
-
-        stage("Integration: Layered gRPC") {
-            steps {
-                dir("${env.PROJECTS_DIR}/arcana-cloud-rust") {
-                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                        sh '''
-                            JENKINS_ID=$(hostname)
-                            RUST_IMAGE=placeholder docker compose -p arcana-ci-rust-grpc \
-                                -f deployment/layered/docker-compose-ci-grpc.yml \
-                                down -v --remove-orphans 2&gt;/dev/null || true
-                            RUST_IMAGE=${IMAGE_TAG}:build-${BUILD_NUMBER} \
-                            docker compose -p arcana-ci-rust-grpc \
-                                -f deployment/layered/docker-compose-ci-grpc.yml up -d
-                            docker network connect arcana-ci-rust-net $JENKINS_ID 2&gt;/dev/null || true
-                            bash scripts/integration-smoke-test.sh \
-                                http://arcana-ci-rust-controller:8080 grpc-layered 240
-                            docker network disconnect arcana-ci-rust-net $JENKINS_ID 2&gt;/dev/null || true
-                        '''
-                    }
-                }
-            }
-            post {
-                always {
-                    dir("${env.PROJECTS_DIR}/arcana-cloud-rust") {
-                        sh '''
-                            docker network disconnect arcana-ci-rust-net $(hostname) 2&gt;/dev/null || true
-                            RUST_IMAGE=placeholder docker compose -p arcana-ci-rust-grpc \
-                                -f deployment/layered/docker-compose-ci-grpc.yml \
-                                down -v --remove-orphans 2&gt;/dev/null || true
-                        '''
-                    }
-                }
-            }
-        }
-        stage("Integration: K8s gRPC") {
-            steps {
-                dir("${env.PROJECTS_DIR}/arcana-cloud-rust") {
-                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                        sh '''#!/bin/bash
-                            export PATH="/var/jenkins_home/bin:${PATH}"
-                            kind version || { echo "kind not found"; exit 1; }
-                            bash scripts/kind-smoke-test.sh "${IMAGE_TAG}:build-${BUILD_NUMBER}" grpc 480
-                        '''
-                    }
-                }
-            }
-            post {
-                always {
-                    dir("${env.PROJECTS_DIR}/arcana-cloud-rust") {
-                        sh '''#!/bin/bash
-                            export PATH="/var/jenkins_home/bin:${PATH}"
-                            kind get clusters 2&gt;/dev/null | grep arcana-ci | while read cl; do
-                              kind delete cluster --name "$cl" 2&gt;/dev/null || true
-                            done
-                        '''
-                    }
-                }
-            }
-        }
-                stage("SonarQube Analysis") {
+        stage("SonarQube Analysis") {
             steps {
                 dir("${env.PROJECTS_DIR}/arcana-cloud-rust") {
                     catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
@@ -167,10 +58,9 @@
                               -Dsonar.projectKey=rust-app \
                               -Dsonar.projectName="Rust App" \
                               -Dsonar.sources=crates \
-                              -Dsonar.exclusions=target/**,**/target/**,**/*.proto \
+                              -Dsonar.exclusions=target/**,**/target/** \
                               -Dsonar.rust.clippy.enabled=false \
-                              -Dsonar.scm.disabled=true \
-                              -Dsonar.rust.lcov.reportPaths=coverage/lcov.info'''
+                              -Dsonar.scm.disabled=true'''
                         }
                     }
                 }

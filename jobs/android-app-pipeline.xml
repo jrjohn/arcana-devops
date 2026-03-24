@@ -55,7 +55,7 @@
         stage("Checkout") {
             steps {
                 dir("${env.PROJECTS_DIR}/arcana-android") {
-                    git url: 'https://github.com/jrjohn/arcana-android.git',
+                    git url: 'https://github.com/YOUR_ORG/arcana-android.git',
                         branch: 'main', credentialsId: 'github-credentials'
                 }
             }
@@ -150,7 +150,7 @@
                                     -e KEY_PASSWORD=$KEY_PASSWORD \
                                     -e STORE_PASSWORD=$STORE_PASSWORD \
                                     localhost:5000/arcana/android-app:1.0.0 \
-                                    bash -c 'echo "$KEYSTORE_B64" | base64 -d > /tmp/arcana.keystore &amp;&amp; KEYSTORE_FILE=/tmp/arcana.keystore bundle exec fastlane bundle_release'
+                                    bash -c 'echo "$KEYSTORE_B64" | base64 -d &gt; /tmp/arcana.keystore &amp;&amp; KEYSTORE_FILE=/tmp/arcana.keystore bundle exec fastlane bundle_release'
                             '''
                         }
                     }
@@ -184,7 +184,7 @@
                                     -e KEY_PASSWORD=$KEY_PASSWORD \
                                     -e STORE_PASSWORD=$STORE_PASSWORD \
                                     localhost:5000/arcana/android-app:1.0.0 \
-                                    bash -c 'echo "$KEYSTORE_B64" | base64 -d > /tmp/arcana.keystore &amp;&amp; KEYSTORE_FILE=/tmp/arcana.keystore bundle exec fastlane build_release'
+                                    bash -c 'echo "$KEYSTORE_B64" | base64 -d &gt; /tmp/arcana.keystore &amp;&amp; KEYSTORE_FILE=/tmp/arcana.keystore bundle exec fastlane build_release'
                             '''
                         }
                     }

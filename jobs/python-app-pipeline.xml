@@ -3,26 +3,15 @@
     <org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobAction plugin="pipeline-model-definition@2.2277.v00573e73ddf1"/>
     <org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobPropertyTrackerAction plugin="pipeline-model-definition@2.2277.v00573e73ddf1">
       <jobProperties/>
-      <triggers>
-        <string>hudson.triggers.SCMTrigger</string>
-      </triggers>
+      <triggers/>
       <parameters/>
       <options/>
     </org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobPropertyTrackerAction>
   </actions>
   <description>Python Pipeline (compose)</description>
   <keepDependencies>false</keepDependencies>
-  <properties>
-    <org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty>
-      <triggers>
-        <hudson.triggers.SCMTrigger>
-          <spec>H/5 * * * *</spec>
-          <ignorePostCommitHooks>false</ignorePostCommitHooks>
-        </hudson.triggers.SCMTrigger>
-      </triggers>
-    </org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty>
-  </properties>
-  <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@4257.vb_2e202808577">
+  <properties/>
+  <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@4256.v991a_f1991c03">
     <script>pipeline {
     agent any
     triggers {
@@ -38,27 +27,8 @@
         stage("Checkout") {
             steps {
                 dir("${env.PROJECTS_DIR}/arcana-cloud-python") {
-                    git url: 'https://github.com/jrjohn/arcana-cloud-python.git',
+                    git url: 'https://github.com/YOUR_ORG/arcana-cloud-python.git',
                         branch: 'main', credentialsId: 'github-credentials'
-                }
-            }
-        }
-                stage("Cleanup Old Images") {
-            steps {
-                dir("${env.PROJECTS_DIR}/arcana-cloud-python") {
-                    sh '''
-                        # Remove dangling/unused images to free disk space
-                        docker image prune -f || true
-                        # Keep only last 3 build-tagged images for this app
-                        docker images --format '{{.Repository}}:{{.Tag}}' \
-                            | grep "${APP_NAME}.*build-" \
-                            | sort -t- -k2 -rn \
-                            | tail -n +4 \
-                            | xargs -r docker rmi 2&gt;/dev/null || true
-                        # Stop leftover test containers
-                        docker compose -f docker-compose.test.yml down \
-                            --remove-orphans 2&gt;/dev/null || true
-                    '''
                 }
             }
         }
@@ -79,68 +49,7 @@
                 }
             }
         }
-        stage("Integration: Layered gRPC") {
-            steps {
-                dir("${env.PROJECTS_DIR}/arcana-cloud-python") {
-                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                        sh '''#!/bin/bash
-                            PYTHON_IMAGE=${IMAGE_TAG}:build-${BUILD_NUMBER} \
-                            docker compose -p arcana-ci-python-grpc \
-                                --env-file deployment/layered/.env.ci \
-                                -f deployment/layered/docker-compose-ci-grpc.yml \
-                                up -d
-                            JENKINS_ID=$(hostname)
-                            docker network connect arcana-ci-python-grpc-net ${JENKINS_ID} 2&gt;/dev/null || true
-                            bash scripts/integration-smoke-test.sh \
-                                http://arcana-ci-python-grpc-controller:5000 grpc-layered 300
-                            docker network disconnect arcana-ci-python-grpc-net ${JENKINS_ID} 2&gt;/dev/null || true
-                        '''
-                    }
-                }
-            }
-            post {
-                always {
-                    dir("${env.PROJECTS_DIR}/arcana-cloud-python") {
-                        sh '''
-                            echo "=== Controller logs ===" &amp;&amp; docker logs arcana-ci-python-grpc-controller 2&gt;&amp;1 | tail -30 || true
-                            echo "=== Service logs ===" &amp;&amp; docker logs arcana-ci-python-grpc-service 2&gt;&amp;1 | tail -20 || true
-                            echo "=== Repository logs ===" &amp;&amp; docker logs arcana-ci-python-grpc-repository 2&gt;&amp;1 | tail -20 || true
-                            docker network disconnect arcana-ci-python-grpc-net $(hostname) 2&gt;/dev/null || true
-                            PYTHON_IMAGE=placeholder docker compose -p arcana-ci-python-grpc \
-                                --env-file deployment/layered/.env.ci \
-                                -f deployment/layered/docker-compose-ci-grpc.yml \
-                                down -v --remove-orphans 2&gt;/dev/null || true
-                        '''
-                    }
-                }
-            }
-        }
-        stage("Integration: K8s gRPC") {
-            steps {
-                dir("${env.PROJECTS_DIR}/arcana-cloud-python") {
-                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                        sh '''#!/bin/bash
-                            export PATH="/var/jenkins_home/bin:${PATH}"
-                            kind version || { echo "kind not found"; exit 1; }
-                            bash scripts/kind-smoke-test.sh "${IMAGE_TAG}:build-${BUILD_NUMBER}" grpc 480
-                        '''
-                    }
-                }
-            }
-            post {
-                always {
-                    dir("${env.PROJECTS_DIR}/arcana-cloud-python") {
-                        sh '''#!/bin/bash
-                            export PATH="/var/jenkins_home/bin:${PATH}"
-                            kind get clusters 2&gt;/dev/null | grep arcana-ci | while read cl; do
-                                kind delete cluster --name "$cl" 2&gt;/dev/null || true
-                            done
-                        '''
-                    }
-                }
-            }
-        }
-                stage("SonarQube Analysis") {
+        stage("SonarQube Analysis") {
             steps {
                 dir("${env.PROJECTS_DIR}/arcana-cloud-python") {
                     catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
@@ -149,11 +58,10 @@
                               -Dsonar.projectKey=python-app \
                               -Dsonar.projectName="Python App" \
                               -Dsonar.sources=. \
-                              -Dsonar.exclusions=venv/**,**/__pycache__/**,tests/**,**/*_pb2*.py,docs/**,**/grpc_protos/**,scripts/**,tools/** \
+                              -Dsonar.exclusions=venv/**,**/__pycache__/** \
                               -Dsonar.python.version=3.12 \
-                              -Dsonar.python.coverage.reportPaths=coverage/coverage.xml \
-                              -Dsonar.coverage.exclusions=app/repository/**,app/dao/**,app/di_container.py,app/repositories/clients/**,app/repositories/routes/**,examples/**,app/communication/impl/grpc_impl.py,app/__init__.py \
-                              -Dsonar.scm.disabled=true'''
+                              -Dsonar.scm.disabled=true \
+                              -Dsonar.python.coverage.reportPaths=coverage/coverage.xml'''
                         }
                     }
                 }

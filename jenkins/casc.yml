@@ -2,6 +2,10 @@ jenkins:
   systemMessage: "Jenkins DevOps Starter Kit — Managed by JCasC"
   numExecutors: 4
   mode: NORMAL
+  disabledAdministrativeMonitors:
+    - "jenkins.diagnostics.ControllerExecutorsAgents"
+    - "jenkins.diagnostics.URICheckEncodingMonitor"
+    - "hudson.diagnosis.ReverseProxySetupMonitor"
   securityRealm:
     local:
       allowsSignup: false
@@ -21,18 +25,14 @@ jenkins:
   nodes:
     - permanent:
         name: "macmini"
-        remoteFS: "${MACMINI_REMOTE_FS:-/Users/jenkins/agent}"
+        remoteFS: "${MACMINI_REMOTE_FS:-/Users/your-user/jenkins-agent}"
         numExecutors: 2
         mode: EXCLUSIVE
         labelString: "macos ios"
         retentionStrategy: "always"
         launcher:
-          ssh:
-            host: "${MACMINI_HOST}"
-            port: 22
-            credentialsId: "macmini-ssh"
-            sshHostKeyVerificationStrategy:
-              nonVerifyingKeyVerificationStrategy: {}
+          inbound:
+            webSocket: true
     - permanent:
         name: "windows"
         remoteFS: "${WINDOWS_REMOTE_FS:-C:\\jenkins-agent}"
@@ -41,12 +41,8 @@ jenkins:
         labelString: "windows"
         retentionStrategy: "always"
         launcher:
-          ssh:
-            host: "${WINDOWS_HOST}"
-            port: 22
-            credentialsId: "windows-ssh"
-            sshHostKeyVerificationStrategy:
-              nonVerifyingKeyVerificationStrategy: {}
+          inbound:
+            webSocket: true
 
 credentials:
   system:
@@ -73,13 +69,21 @@ credentials:
               id: "sonarqube-token"
               description: "SonarQube Authentication Token"
               secret: "${SONARQUBE_TOKEN}"
+          - usernamePassword:
+              scope: GLOBAL
+              id: "github-credentials"
+              username: "${GITHUB_USER:-your-user}"
+              password: "${GITHUB_TOKEN}"
+              description: "GitHub PAT for SCM polling"
 
 unclassified:
+  cspConfiguration:
+    enforce: true
   location:
-    url: "${JENKINS_URL:-http://localhost:8080/}"
+    url: "${JENKINS_URL:-https://your-domain.com/jenkins/}"
   sonarGlobalConfiguration:
     buildWrapperEnabled: true
     installations:
       - name: "SonarQube"
-        serverUrl: "${SONAR_HOST_URL:-http://sonarqube:9000}"
+        serverUrl: "${SONAR_HOST_URL:-http://sonarqube:9000/sonarqube}"
         credentialsId: "sonarqube-token"

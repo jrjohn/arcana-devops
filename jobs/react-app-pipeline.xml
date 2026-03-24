@@ -1,97 +1,85 @@
-<?xml version='1.1' encoding='UTF-8'?>
-<flow-definition plugin="workflow-job@1571.vb_423c255d6d9">
+<?xml version="1.1" encoding="UTF-8"?><flow-definition plugin="workflow-job@1571.vb_423c255d6d9">
   <actions>
     <org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobAction plugin="pipeline-model-definition@2.2277.v00573e73ddf1"/>
     <org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobPropertyTrackerAction plugin="pipeline-model-definition@2.2277.v00573e73ddf1">
       <jobProperties/>
-      <triggers>
-        <string>hudson.triggers.SCMTrigger</string>
-      </triggers>
+      <triggers/>
       <parameters/>
       <options/>
     </org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobPropertyTrackerAction>
   </actions>
   <description>React Pipeline (compose)</description>
   <keepDependencies>false</keepDependencies>
-  <properties>
-    <org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty>
-      <triggers>
-        <hudson.triggers.SCMTrigger>
-          <spec>H/5 * * * *</spec>
-          <ignorePostCommitHooks>false</ignorePostCommitHooks>
-        </hudson.triggers.SCMTrigger>
-      </triggers>
-    </org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty>
-  </properties>
-  <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@4257.vb_2e202808577">
+  <properties/>
+  <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@4256.v991a_f1991c03">
     <script>pipeline {
     agent any
     triggers {
-        pollSCM(&apos;H/5 * * * *&apos;)
+        pollSCM('H/5 * * * *')
     }
     environment {
-        APP_NAME  = &quot;react-app&quot;
-        REGISTRY  = &quot;localhost:5000&quot;
-        IMAGE_TAG = &quot;${REGISTRY}/arcana/${APP_NAME}&quot;
-        VERSION   = &quot;1.0.0&quot;
+        APP_NAME  = "react-app"
+        REGISTRY  = "localhost:5000"
+        IMAGE_TAG = "${REGISTRY}/arcana/${APP_NAME}"
+        VERSION   = "1.0.0"
     }
     stages {
-        stage(&quot;Checkout&quot;) {
+        stage("Checkout") {
             steps {
-                dir(&quot;${env.PROJECTS_DIR}/arcana-react&quot;) {
-                    git url: &apos;https://github.com/jrjohn/arcana-react.git&apos;,
-                        branch: &apos;main&apos;, credentialsId: &apos;github-credentials&apos;
+                dir("${env.PROJECTS_DIR}/arcana-react") {
+                    git url: 'https://github.com/YOUR_ORG/arcana-react.git',
+                        branch: 'main', credentialsId: 'github-credentials'
                 }
             }
         }
-        stage(&quot;Docker Compose Build&quot;) {
+        stage("Docker Compose Build") {
             steps {
-                dir(&quot;${env.PROJECTS_DIR}/arcana-react&quot;) {
-                    sh &quot;VERSION=${VERSION} docker compose -f docker-compose.ci.yml build&quot;
-                    sh &quot;docker tag localhost:5000/arcana/${APP_NAME}:${VERSION} ${IMAGE_TAG}:build-${BUILD_NUMBER}&quot;
+                dir("${env.PROJECTS_DIR}/arcana-react") {
+                    sh "VERSION=${VERSION} docker compose -f docker-compose.ci.yml build"
+                    sh "docker tag localhost:5000/arcana/${APP_NAME}:${VERSION} ${IMAGE_TAG}:build-${BUILD_NUMBER}"
                 }
             }
         }
-        stage(&quot;Unit Tests&quot;) {
+        stage("Unit Tests") {
             steps {
-                dir(&quot;${env.PROJECTS_DIR}/arcana-react&quot;) {
-                    catchError(buildResult: &apos;SUCCESS&apos;, stageResult: &apos;UNSTABLE&apos;) {
-                        sh &quot;docker compose -f docker-compose.test.yml run --rm --build test&quot;
+                dir("${env.PROJECTS_DIR}/arcana-react") {
+                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                        sh "docker compose -f docker-compose.test.yml run --rm --build test"
                     }
                 }
             }
         }
-        stage(&quot;SonarQube Analysis&quot;) {
+        stage("SonarQube Analysis") {
             steps {
-                dir(&quot;${env.PROJECTS_DIR}/arcana-react&quot;) {
-                    catchError(buildResult: &apos;SUCCESS&apos;, stageResult: &apos;UNSTABLE&apos;) {
-                        withSonarQubeEnv(&apos;SonarQube&apos;) {
-                            sh &apos;&apos;&apos;sonar-scanner \
+                dir("${env.PROJECTS_DIR}/arcana-react") {
+                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                        withSonarQubeEnv('SonarQube') {
+                            sh '''sonar-scanner \
                               -Dsonar.projectKey=react-app \
-                              -Dsonar.projectName=&quot;React App&quot; \
+                              -Dsonar.projectName="React App" \
                               -Dsonar.sources=src \
                               -Dsonar.exclusions=node_modules/**,build/**,dist/** \
                               -Dsonar.scm.disabled=true \
-                              -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info&apos;&apos;&apos;
+                              -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info'''
                         }
                     }
                 }
             }
         }
-        stage(&quot;Image Info&quot;) {
-            steps { sh &quot;docker images --format &apos;table {{.Repository}}:{{.Tag}}\t{{.Size}}&apos; ${IMAGE_TAG}:${VERSION}&quot; }
+        stage("Image Info") {
+            steps { sh "docker images --format 'table {{.Repository}}:{{.Tag}}\t{{.Size}}' ${IMAGE_TAG}:${VERSION}" }
         }
-        stage(&quot;Push to Registry&quot;) {
+        stage("Push to Registry") {
             steps {
-                sh &quot;docker push ${IMAGE_TAG}:${VERSION}&quot;
-                sh &quot;docker push ${IMAGE_TAG}:build-${BUILD_NUMBER}&quot;
+                sh "docker push ${IMAGE_TAG}:${VERSION}"
+                sh "docker push ${IMAGE_TAG}:build-${BUILD_NUMBER}"
             }
         }
     }
     post {
-        success { echo &quot;Pipeline SUCCESS - ${APP_NAME}:${VERSION}&quot; }
-        failure { echo &quot;Pipeline FAILED&quot; }
-        always  { echo &quot;Build number ${BUILD_NUMBER} done&quot; }
+        success { echo "Pipeline SUCCESS - ${APP_NAME}:${VERSION}" }
+        failure { echo "Pipeline FAILED" }
+        always  { echo "Build number ${BUILD_NUMBER} done" }
     }
 }
 

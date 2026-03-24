@@ -38,7 +38,7 @@
         stage("Checkout") {
             steps {
                 dir("${env.PROJECTS_DIR}/arcana-embedded-stm32") {
-                    git url: 'https://github.com/jrjohn/arcana-embedded-stm32.git',
+                    git url: 'https://github.com/YOUR_ORG/arcana-embedded-stm32.git',
                         branch: 'main', credentialsId: 'github-credentials'
                 }
             }
@@ -70,7 +70,7 @@
                         sonarsource/sonar-scanner-cli:11 \
                         sonar-scanner \
                         -Dsonar.host.url=http://sonarqube:9000/sonarqube \
-                        -Dsonar.token=squ_5ce2319b9d8ca2b1db4e0f5bdf36b34249561f18 \
+                        -Dsonar.token=${SONAR_TOKEN} \
                         -Dsonar.projectKey=${PROJECT_NAME}"""
                 }
             }

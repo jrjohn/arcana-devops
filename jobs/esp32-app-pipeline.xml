@@ -1,77 +1,65 @@
-<?xml version='1.1' encoding='UTF-8'?>
-<flow-definition plugin="workflow-job@1571.vb_423c255d6d9">
+<?xml version="1.1" encoding="UTF-8"?><flow-definition plugin="workflow-job@1571.vb_423c255d6d9">
   <actions>
     <org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobAction plugin="pipeline-model-definition@2.2277.v00573e73ddf1"/>
     <org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobPropertyTrackerAction plugin="pipeline-model-definition@2.2277.v00573e73ddf1">
       <jobProperties/>
-      <triggers>
-        <string>hudson.triggers.SCMTrigger</string>
-      </triggers>
+      <triggers/>
       <parameters/>
       <options/>
     </org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobPropertyTrackerAction>
   </actions>
   <description>ESP32 Firmware Pipeline (docker pull + compose)</description>
   <keepDependencies>false</keepDependencies>
-  <properties>
-    <org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty>
-      <triggers>
-        <hudson.triggers.SCMTrigger>
-          <spec>H/5 * * * *</spec>
-          <ignorePostCommitHooks>false</ignorePostCommitHooks>
-        </hudson.triggers.SCMTrigger>
-      </triggers>
-    </org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty>
-  </properties>
-  <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@4257.vb_2e202808577">
+  <properties/>
+  <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@4256.v991a_f1991c03">
     <script>pipeline {
     agent any
     triggers {
-        pollSCM(&apos;H/5 * * * *&apos;)
+        pollSCM('H/5 * * * *')
     }
     environment {
-        APP_NAME    = &quot;esp32-app&quot;
-        VERSION     = &quot;1.0.0&quot;
-        PROJECT_DIR = &quot;${env.PROJECTS_DIR}/arcana-embedded-esp32&quot;
+        APP_NAME    = "esp32-app"
+        VERSION     = "1.0.0"
+        PROJECT_DIR = "${env.PROJECTS_DIR}/arcana-embedded-esp32"
     }
     stages {
-        stage(&quot;Checkout&quot;) {
+        stage("Checkout") {
             steps {
-                dir(&quot;${env.PROJECTS_DIR}/arcana-embedded-esp32&quot;) {
-                    git url: &apos;https://github.com/jrjohn/arcana-embedded-esp32.git&apos;,
-                        branch: &apos;main&apos;, credentialsId: &apos;github-credentials&apos;
+                dir("${env.PROJECTS_DIR}/arcana-embedded-esp32") {
+                    git url: 'https://github.com/YOUR_ORG/arcana-embedded-esp32.git',
+                        branch: 'main', credentialsId: 'github-credentials'
                 }
             }
         }
-        stage(&quot;Pull Build Image&quot;) {
-            steps { sh &quot;docker pull espressif/idf:v5.5.2&quot; }
+        stage("Pull Build Image") {
+            steps { sh "docker pull espressif/idf:v5.5.2" }
         }
-        stage(&quot;Build Firmware&quot;) {
+        stage("Build Firmware") {
             steps {
-                dir(&quot;${PROJECT_DIR}&quot;) {
-                    sh &quot;docker compose -f docker-compose.ci.yml run --rm esp32-build&quot;
+                dir("${PROJECT_DIR}") {
+                    sh "docker compose -f docker-compose.ci.yml run --rm esp32-build"
                 }
             }
         }
-        stage(&quot;SonarQube Analysis&quot;) {
+        stage("SonarQube Analysis") {
             steps {
-                echo &quot;C/C++ requires SonarQube Developer Edition -- skipping analysis&quot;
+                echo "C/C++ requires SonarQube Developer Edition -- skipping analysis"
             }
         }
-        stage(&quot;Extract Artifacts&quot;) {
+        stage("Extract Artifacts") {
             steps {
-                sh &quot;rm -rf /tmp/esp32-app-firmware &amp;&amp; mkdir -p /tmp/esp32-app-firmware&quot;
-                sh &quot;cp ${PROJECT_DIR}/build/mqtt5.bin /tmp/esp32-app-firmware/ || echo no-bin&quot;
-                sh &quot;cp ${PROJECT_DIR}/build/bootloader/bootloader.bin /tmp/esp32-app-firmware/ || echo no-bootloader&quot;
-                sh &quot;cp ${PROJECT_DIR}/build/partition_table/partition-table.bin /tmp/esp32-app-firmware/ || echo no-partition&quot;
-                sh &quot;ls -la /tmp/esp32-app-firmware/&quot;
+                sh "rm -rf /tmp/esp32-app-firmware &amp;&amp; mkdir -p /tmp/esp32-app-firmware"
+                sh "cp ${PROJECT_DIR}/build/mqtt5.bin /tmp/esp32-app-firmware/ || echo no-bin"
+                sh "cp ${PROJECT_DIR}/build/bootloader/bootloader.bin /tmp/esp32-app-firmware/ || echo no-bootloader"
+                sh "cp ${PROJECT_DIR}/build/partition_table/partition-table.bin /tmp/esp32-app-firmware/ || echo no-partition"
+                sh "ls -la /tmp/esp32-app-firmware/"
             }
         }
     }
     post {
-        success { echo &quot;Pipeline SUCCESS - esp32 firmware built&quot; }
-        failure { echo &quot;Pipeline FAILED&quot; }
-        always  { echo &quot;Build done&quot; }
+        success { echo "Pipeline SUCCESS - esp32 firmware built" }
+        failure { echo "Pipeline FAILED" }
+        always  { echo "Build done" }
     }
 }
 

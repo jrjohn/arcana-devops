@@ -1,112 +1,84 @@
-<?xml version='1.1' encoding='UTF-8'?>
-<flow-definition plugin="workflow-job@1571.vb_423c255d6d9">
-  <actions>
-    <org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobAction plugin="pipeline-model-definition@2.2277.v00573e73ddf1"/>
-    <org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobPropertyTrackerAction plugin="pipeline-model-definition@2.2277.v00573e73ddf1">
-      <jobProperties>
-        <string>org.jenkinsci.plugins.workflow.job.properties.DisableConcurrentBuildsJobProperty</string>
-        <string>jenkins.model.BuildDiscarderProperty</string>
-      </jobProperties>
-      <triggers>
-        <string>hudson.triggers.SCMTrigger</string>
-      </triggers>
-      <parameters/>
-      <options/>
-    </org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobPropertyTrackerAction>
-  </actions>
+<?xml version="1.1" encoding="UTF-8"?><flow-definition plugin="workflow-job">
   <description>.NET Cross-Platform Pipeline (arcana-windows core libraries + tests, excludes WinUI 3)</description>
   <keepDependencies>false</keepDependencies>
-  <properties>
-    <org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty>
-      <triggers>
-        <hudson.triggers.SCMTrigger>
-          <spec>H/5 * * * *</spec>
-          <ignorePostCommitHooks>false</ignorePostCommitHooks>
-        </hudson.triggers.SCMTrigger>
-      </triggers>
-    </org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty>
-    <jenkins.model.BuildDiscarderProperty>
-      <strategy class="hudson.tasks.LogRotator">
-        <daysToKeep>-1</daysToKeep>
-        <numToKeep>10</numToKeep>
-        <artifactDaysToKeep>-1</artifactDaysToKeep>
-        <artifactNumToKeep>-1</artifactNumToKeep>
-        <removeLastBuild>false</removeLastBuild>
-      </strategy>
-    </jenkins.model.BuildDiscarderProperty>
-    <org.jenkinsci.plugins.workflow.job.properties.DisableConcurrentBuildsJobProperty>
-      <abortPrevious>false</abortPrevious>
-    </org.jenkinsci.plugins.workflow.job.properties.DisableConcurrentBuildsJobProperty>
-  </properties>
-  <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@4257.vb_2e202808577">
+  <properties/>
+  <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps">
     <script>
 pipeline {
     agent any
     triggers {
-        pollSCM(&apos;H/5 * * * *&apos;)
+        pollSCM('H/5 * * * *')
     }
     environment {
-        APP_NAME  = &apos;dotnet-app&apos;
-        REGISTRY  = &apos;localhost:5000/arcana&apos;
-        IMAGE_TAG = &quot;${REGISTRY}/${APP_NAME}&quot;
-        VERSION   = &apos;0.2.0&apos;
+        APP_NAME  = 'dotnet-app'
+        REGISTRY  = 'localhost:5000/arcana'
+        IMAGE_TAG = "${REGISTRY}/${APP_NAME}"
+        VERSION   = '0.2.0'
     }
     options {
-        timeout(time: 15, unit: &apos;MINUTES&apos;)
+        timeout(time: 15, unit: 'MINUTES')
         disableConcurrentBuilds()
-        buildDiscarder(logRotator(numToKeepStr: &apos;10&apos;))
+        buildDiscarder(logRotator(numToKeepStr: '10'))
     }
     stages {
-        stage(&apos;Checkout&apos;) {
+        stage('Checkout') {
             steps {
-                dir(&quot;${env.PROJECTS_DIR}/arcana-windows&quot;) {
-                    git url: &apos;https://github.com/jrjohn/arcana-windows.git&apos;,
-                        branch: &apos;main&apos;, credentialsId: &apos;github-credentials&apos;
+                dir("${env.PROJECTS_DIR}/arcana-windows") {
+                    git url: 'https://github.com/YOUR_ORG/arcana-windows.git',
+                        branch: 'main', credentialsId: 'github-credentials'
                 }
             }
         }
-        stage(&apos;Docker Build&apos;) {
+        stage('Docker Build') {
             steps {
-                dir(&quot;${env.PROJECTS_DIR}/arcana-windows&quot;) {
-                    sh &quot;VERSION=${VERSION} docker compose build&quot;
-                    sh &quot;docker tag ${IMAGE_TAG}:${VERSION} ${IMAGE_TAG}:build-${BUILD_NUMBER}&quot;
+                dir("${env.PROJECTS_DIR}/arcana-windows") {
+                    sh "VERSION=${VERSION} docker compose build"
+                    sh "docker tag ${IMAGE_TAG}:${VERSION} ${IMAGE_TAG}:build-${BUILD_NUMBER}"
                 }
             }
         }
-        stage(&apos;Unit Tests&apos;) {
+        stage('Unit Tests') {
             steps {
-                dir(&quot;${env.PROJECTS_DIR}/arcana-windows&quot;) {
-                    catchError(buildResult: &apos;SUCCESS&apos;, stageResult: &apos;UNSTABLE&apos;) {
-                        sh &quot;docker compose -f docker-compose.test.yml run --rm --build test&quot;
+                dir("${env.PROJECTS_DIR}/arcana-windows") {
+                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                        sh "docker compose -f docker-compose.test.yml run --rm --build test"
                     }
                 }
             }
         }
-        stage(&apos;SonarQube Analysis&apos;) {
+        stage('SonarQube Analysis') {
             steps {
-                dir(&quot;${env.PROJECTS_DIR}/arcana-windows&quot;) {
-                    catchError(buildResult: &apos;SUCCESS&apos;, stageResult: &apos;UNSTABLE&apos;) {
-                        sh &quot;&quot;&quot;SONAR_TOKEN=squ_5ce2319b9d8ca2b1db4e0f5bdf36b34249561f18 SONAR_HOST_URL=http://sonarqube:9000/sonarqube SONAR_PROJECT_KEY=dotnet-app SONAR_PROJECT_NAME=&apos;Dotnet App&apos; docker compose -f docker-compose.sonar.yml run --rm --build sonar&quot;&quot;&quot;
+                dir("${env.PROJECTS_DIR}/arcana-windows") {
+                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                        withSonarQubeEnv('SonarQube') {
+                            sh '''sonar-scanner \
+                              -Dsonar.projectKey=dotnet-app \
+                              -Dsonar.projectName="Dotnet App" \
+                              -Dsonar.sources=src \
+                              -Dsonar.exclusions=**/bin/**,**/obj/**,**/TestResults/**,**/*.cs \
+                              -Dsonar.scm.disabled=true \
+                              -Dsonar.cs.opencover.reportsPaths=test-results/**/coverage.cobertura.xml'''
+                        }
                     }
                 }
             }
         }
-        stage(&apos;Image Info&apos;) {
+        stage('Image Info') {
             steps {
-                sh &quot;docker images --format &apos;table {{.Repository}}:{{.Tag}}	{{.Size}}&apos; ${IMAGE_TAG}:${VERSION}&quot;
+                sh "docker images --format 'table {{.Repository}}:{{.Tag}}\t{{.Size}}' ${IMAGE_TAG}:${VERSION}"
             }
         }
-        stage(&apos;Push to Registry&apos;) {
+        stage('Push to Registry') {
             steps {
-                sh &quot;docker push ${IMAGE_TAG}:${VERSION}&quot;
-                sh &quot;docker push ${IMAGE_TAG}:build-${BUILD_NUMBER}&quot;
+                sh "docker push ${IMAGE_TAG}:${VERSION}"
+                sh "docker push ${IMAGE_TAG}:build-${BUILD_NUMBER}"
             }
         }
     }
     post {
-        success { echo &quot;Pipeline SUCCESS - arcana-windows .NET ${APP_NAME}:${VERSION}&quot; }
-        failure { echo &quot;Pipeline FAILED&quot; }
-        always  { echo &quot;Build number ${BUILD_NUMBER} done&quot; }
+        success { echo "Pipeline SUCCESS - arcana-windows .NET ${APP_NAME}:${VERSION}" }
+        failure { echo "Pipeline FAILED" }
+        always  { echo "Build number ${BUILD_NUMBER} done" }
     }
 }
 </script>
