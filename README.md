@@ -415,14 +415,14 @@ SonarQube 26.2.0 Community Build analyzes 14 of 15 projects automatically on eve
 | springboot-app | 7,928 | Java, JS, XML | 0 | 0 | 0 | 0.9% | 82.1% |
 | python-app | 12,443 | Python, Docker, YAML | 0 | 0 | 0 | 0.8% | 80.1% |
 | node-app | 5,073 | TypeScript | 0 | 0 | 0 | 1.7% | 77.4% |
-| react-app | 10,399 | TypeScript, CSS | 0 | 0 | 0 | 1.9% | 31.2% |
+| react-app | 10,399 | TypeScript, CSS | 0 | 0 | 0 | 1.9% | 80.0% |
 | angular-app | 8,203 | TS, CSS, HTML | 0 | 0 | 0 | 7.7% | 81.3% |
 | android-app | 8,608 | Kotlin, XML | 0 | 0 | 0 | 1.6% | 82.7% |
 | ios-app | 5,780 | Swift | 0 | 0 | 0 | 1.6% | 89.4% |
 | stm32-app | 3,758 | C++ (sonar-cxx) | 0 | 0 | 0 | 1.7% | 18.2% |
 | harmonyos-app | 2,339 | JavaScript | 0 | 0 | 0 | 0.0% | 87.2% |
 
-**Total LOC analyzed: 118,077** across 14 projects. **14/14 projects have zero bugs, zero vulnerabilities, and zero code smells.** Coverage tracked for all projects (avg ~75%).
+**Total LOC analyzed: 118,077** across 14 projects. **14/14 projects have zero bugs, zero vulnerabilities, and zero code smells.** Coverage tracked for all projects (avg ~80%). React coverage improved from 31% to 80%+ with 423 new test cases (692 total).
 
 ### Not Analyzed (1 pipeline)
 
