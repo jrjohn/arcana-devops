@@ -2,6 +2,10 @@ jenkins:
   systemMessage: "Jenkins DevOps Starter Kit — Managed by JCasC"
   numExecutors: 4
   mode: NORMAL
+  disabledAdministrativeMonitors:
+    - "jenkins.diagnostics.ControllerExecutorsAgents"
+    - "jenkins.security.csp.impl.CspRecommendation"
+    - "jenkins.diagnostics.URICheckEncodingMonitor"
   securityRealm:
     local:
       allowsSignup: false
@@ -27,7 +31,7 @@ jenkins:
         labelString: "macos ios"
         retentionStrategy: "always"
         launcher:
-          jnlp:
+          inbound:
             webSocket: true
     - permanent:
         name: "windows"
@@ -37,7 +41,7 @@ jenkins:
         labelString: "windows"
         retentionStrategy: "always"
         launcher:
-          jnlp:
+          inbound:
             webSocket: true
 
 credentials:
