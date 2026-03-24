@@ -4,8 +4,8 @@ jenkins:
   mode: NORMAL
   disabledAdministrativeMonitors:
     - "jenkins.diagnostics.ControllerExecutorsAgents"
-    - "jenkins.security.csp.impl.CspRecommendation"
     - "jenkins.diagnostics.URICheckEncodingMonitor"
+    - "hudson.diagnosis.ReverseProxySetupMonitor"
   securityRealm:
     local:
       allowsSignup: false
@@ -77,6 +77,8 @@ credentials:
               description: "GitHub PAT for SCM polling"
 
 unclassified:
+  cspConfiguration:
+    enforce: true
   location:
     url: "${JENKINS_URL:-https://arcana.boo/jenkins/}"
   sonarGlobalConfiguration:
