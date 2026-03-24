@@ -4,14 +4,14 @@
 ![Jenkins](https://img.shields.io/badge/Jenkins-LTS-red?style=flat-square&logo=jenkins)
 ![Docker](https://img.shields.io/badge/Docker-Compose%20v2-blue?style=flat-square&logo=docker)
 ![Pipelines](https://img.shields.io/badge/Pipelines-15%20(15%20ALL%20GREEN)-success?style=flat-square)
-![SonarQube](https://img.shields.io/badge/SonarQube-26.2.0%20(13%20projects)-informational?style=flat-square&logo=sonarqube)
+![SonarQube](https://img.shields.io/badge/SonarQube-26.2.0%20(14%20projects%20%7C%20118K%20LOC)-informational?style=flat-square&logo=sonarqube)
 ![Nexus](https://img.shields.io/badge/Nexus-3.90.1%20(19%2B%20repos)-blueviolet?style=flat-square&logo=sonatype)
 ![Platforms](https://img.shields.io/badge/Platforms-5%20(Web%20%7C%20Embedded%20%7C%20Mobile%20%7C%20Desktop%20%7C%20Cloud)-blueviolet?style=flat-square)
 ![Monitoring](https://img.shields.io/badge/Monitoring-Prometheus%20%2B%20Grafana%20%2B%20Loki-orange?style=flat-square)
 ![Dashboards](https://img.shields.io/badge/Dashboards-5%20pre--loaded-brightgreen?style=flat-square)
 ![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)
 
-Production-tested Jenkins CI/CD environment with 15 pre-built pipelines, SonarQube 26.2.0 code analysis (13 projects), Nexus Repository Manager 3.90.1 (19+ proxy repos for artifact caching), Docker Registry, and a full monitoring stack (Prometheus + Grafana + Loki). One command to deploy.
+Production-tested Jenkins CI/CD environment with 15 pre-built pipelines, SonarQube 26.2.0 code analysis (14 projects, 118K LOC, 11/14 zero issues), Nexus Repository Manager 3.90.1 (19+ proxy repos for artifact caching), Docker Registry, and a full monitoring stack (Prometheus + Grafana + Loki). One command to deploy.
 
 **15 pipelines tested and verified — ALL GREEN** across Go, Rust, Vue, .NET, Spring Boot, Python/Flask, Node.js/Express, React, Angular, ESP32, STM32, Android, HarmonyOS, iOS, and Windows — covering web, cloud, embedded, and mobile platforms. **15/15 pipelines produce SUCCESS status** with all integration tests passing (Layered HTTP, Layered gRPC, K8s gRPC).
 
@@ -227,7 +227,7 @@ flowchart LR
 |----------|--------|---------|
 | **Reproducibility** | 9/10 | JCasC + Groovy init + Docker Compose = fully declarative, one-command deploy |
 | **Pipeline Coverage** | 10/10 | 15 pipelines across 5 platforms (Web, Cloud, Embedded, Mobile, Desktop) — ALL GREEN |
-| **Code Analysis** | 9/10 | SonarQube 26.2.0 with 13/15 projects analyzed (incl. STM32 via sonar-cxx and iOS via sonar-apple), sonar-scanner 8.0.1, Node.js 24 |
+| **Code Analysis** | 9/10 | SonarQube 26.2.0 with 14/15 projects analyzed (118K LOC, 11/14 zero issues), sonar-scanner 8.0.1, Node.js 24 |
 | **Monitoring** | 9/10 | Prometheus + Grafana + Loki + 5 dashboards + commit author tracking |
 | **Cross-Platform** | 9/10 | ARM64 native + QEMU x86 emulation, Mac/Windows remote agents via JNLP WebSocket |
 | **Log Cleanliness** | 10/10 | 15/15 pipelines ALL GREEN — all stages SUCCESS including integration tests |
@@ -244,7 +244,7 @@ flowchart LR
 - **15/15 ALL GREEN**: Every pipeline produces SUCCESS status — all integration tests passing (Layered HTTP, Layered gRPC, K8s gRPC), all unit tests fixed across Angular, Go, Node.js, Python, Spring Boot
 - **Nexus Proxy Caching**: 19+ proxy repositories (npm, PyPI, Go, Maven, NuGet, Docker Hub, APT Debian/Ubuntu, Raw) — all CI Dockerfiles download dependencies through Nexus, enabling faster builds and reduced external network dependency
 - **Authelia 2FA**: All web UIs (Jenkins, SonarQube, Nexus, Grafana, Prometheus) protected by Authelia two-factor authentication behind nginx reverse proxy with Let's Encrypt TLS
-- **SonarQube 26.2.0 Integration**: 13 projects analyzed (Go, Rust, Vue, .NET, Spring Boot, Python, Node.js, React, Angular, Android, HarmonyOS, iOS via sonar-apple, STM32 via sonar-cxx) with sonar-scanner 8.0.1 and Node.js 24
+- **SonarQube 26.2.0 Integration**: 14/15 projects analyzed (118K LOC total, 11/14 with zero bugs and zero smells), coverage tracked for all projects (avg ~75%), sonar-scanner 8.0.1 and Node.js 24
 - **Configuration as Code**: JCasC for Jenkins config, Groovy init for idempotent job creation, Docker Compose for infrastructure — no manual UI setup
 - **Full Monitoring Stack**: Prometheus metrics + Grafana dashboards + Loki log aggregation, with commit author tracking via custom exporter
 - **Multi-Architecture**: ARM64 native support (Oracle Cloud ARM), QEMU x86_64 emulation for Android/HarmonyOS, remote JNLP WebSocket agents for Mac/Windows
@@ -341,8 +341,8 @@ All 15 pipelines are pre-loaded via Groovy init script on first boot:
 | 1 | go-app-pipeline | Docker compose build + push | Cloud / Web | Go |
 | 2 | rust-app-pipeline | Docker compose build + push | Cloud / Web | Rust |
 | 3 | vue-app-pipeline | Docker compose build + push | Frontend | JS/TS/CSS |
-| 4 | dotnet-app-pipeline | Docker compose build + push | Cloud / Web | Partial |
-| 5 | springboot-app-pipeline | Docker compose build + push | Cloud / Web | Java/TS/CSS |
+| 4 | dotnet-app-pipeline | Docker compose build + push | Cloud / Web | C# (dotnet-sonarscanner) |
+| 5 | springboot-app-pipeline | Docker compose build + push | Cloud / Web | Java/JS/XML |
 | 6 | python-app-pipeline | Docker compose build + push | Cloud / Web | Python |
 | 7 | node-app-pipeline | Docker compose build + push | Cloud / Web | TypeScript |
 | 8 | react-app-pipeline | Docker compose build + push | Frontend | TS/CSS |
@@ -350,11 +350,11 @@ All 15 pipelines are pre-loaded via Groovy init script on first boot:
 | 10 | esp32-app-pipeline | Docker compose run (embedded) | Embedded | Skip (C/C++) |
 | 11 | stm32-app-pipeline | Docker compose build | Embedded | C/C++ (sonar-cxx) |
 | 12 | android-app-pipeline | Docker compose build + run (amd64) | Mobile | Java/Kotlin |
-| 13 | harmonyos-app-pipeline | Docker compose build + run (amd64) | Mobile | ArkTS |
+| 13 | harmonyos-app-pipeline | Docker compose build + run (amd64) | Mobile | JavaScript |
 | 14 | ios-app | Swift build + test (Mac agent) | Mobile | Swift (sonar-apple) |
 | 15 | windows-app-pipeline | dotnet build + test (Windows agent) | Desktop | Skip (remote) |
 
-> **Note:** iOS and Windows pipelines require dedicated agents (Mac Mini / Windows machine). See [Adding SSH Agents](#adding-ssh-agents) below. ESP32 C/C++ analysis requires SonarQube Developer Edition. STM32 uses the sonar-cxx community plugin. iOS uses sonar-apple.
+> **Note:** iOS and Windows pipelines require dedicated agents (Mac Mini / Windows machine). See [Adding SSH Agents](#adding-ssh-agents) below. ESP32 C/C++ analysis requires SonarQube Developer Edition. STM32 uses sonar-cxx, iOS uses sonar-apple, .NET uses dotnet-sonarscanner, HarmonyOS ArkTS is recognized as JavaScript.
 
 ### Pipeline Architecture
 
@@ -402,34 +402,35 @@ graph TD
 
 ## SonarQube Code Analysis
 
-SonarQube 26.2.0 Community Build analyzes 13 of 15 projects automatically on every pipeline run. The Jenkins custom image includes sonar-scanner-cli 8.0.1 and Node.js 24 for JavaScript/TypeScript analysis. STM32 is analyzed via the sonar-cxx community plugin, and iOS via sonar-apple.
+SonarQube 26.2.0 Community Build analyzes 14 of 15 projects automatically on every pipeline run. The Jenkins custom image includes sonar-scanner-cli 8.0.1 and Node.js 24 for JavaScript/TypeScript analysis. STM32 is analyzed via the sonar-cxx community plugin, iOS via sonar-apple, and .NET via dotnet-sonarscanner.
 
 ### Analysis Results
 
-| Project | LOC | Languages | Bugs | Vulnerabilities | Code Smells | Duplication |
-|---------|-----|-----------|------|-----------------|-------------|-------------|
-| go-app | 31 | Go, Docker | 0 | 0 | 0 | 0% |
-| rust-app | 19,099 | Rust | 0 | 2 | 3 | 5.8% |
-| vue-app | 6,578 | TS, JS, CSS | 7 | 0 | 96 | 1.4% |
-| dotnet-app | - | *(C# excluded)* | 0 | 0 | 0 | 0% |
-| springboot-app | 6,375 | TS, YAML, Python, CSS, XML | 1 | 18 | 88 | 1.4% |
-| python-app | 22,905 | Python, HTML, YAML | 24 | 24 | 502 | 28.8% |
-| node-app | 13,706 | TypeScript, HTML, YAML | 2 | 11 | 129 | 4.8% |
-| react-app | 10,402 | TypeScript, CSS | 11 | 0 | 105 | 1.9% |
-| angular-app | 11,045 | TS, CSS, HTML, JS | 9 | 0 | 157 | 6.8% |
-| android-app | 8,692 | Kotlin, XML | 0 | 0 | 0 | 1.5% |
-| ios-app | 5,780 | Swift | 0 | 0 | 0 | 1.6% |
-| stm32-app | 861 | C, C++ | 0 | 0 | 0 | 0% |
-| harmonyos-app | - | *(ArkTS pending)* | 0 | 0 | 0 | 0% |
+| Project | LOC | Languages | Bugs | Vulns | Smells | Dup | Coverage |
+|---------|-----|-----------|------|-------|--------|-----|----------|
+| go-app | 14,554 | Go, Docker, YAML | 0 | 0 | 0 | 1.0% | 88.6% |
+| rust-app | 22,414 | Rust | 0 | 0 | 0 | 6.9% | 80.4% |
+| vue-app | 6,790 | TS, JS, CSS | 7 | 0 | 92 | 1.5% | 92.3% |
+| dotnet-app | 9,785 | C#, Docker | 0 | 0 | 0 | 0.2% | 80.3% |
+| springboot-app | 7,928 | Java, JS, XML | 0 | 0 | 0 | 0.9% | 82.1% |
+| python-app | 12,443 | Python, Docker, YAML | 0 | 1 | 0 | 0.8% | 80.1% |
+| node-app | 5,073 | TypeScript | 0 | 0 | 0 | 1.7% | 77.4% |
+| react-app | 10,402 | TypeScript, CSS | 11 | 0 | 105 | 1.9% | 31.4% |
+| angular-app | 8,203 | TS, CSS, HTML | 0 | 0 | 0 | 7.7% | 81.3% |
+| android-app | 8,608 | Kotlin, XML | 0 | 0 | 3 | 1.6% | 82.7% |
+| ios-app | 5,780 | Swift | 0 | 0 | 0 | 1.6% | 89.4% |
+| stm32-app | 3,758 | C++ (sonar-cxx) | 0 | 0 | 0 | 1.7% | 18.2% |
+| harmonyos-app | 2,339 | JavaScript | 0 | 0 | 0 | 0.0% | 87.2% |
 
-**Total LOC analyzed: 105,474** across 13 projects.
+**Total LOC analyzed: 118,077** across 14 projects. **11/14 projects have zero bugs and zero code smells.** Coverage tracked for all projects (avg ~75%).
 
-### Not Analyzed (2 pipelines)
+### Not Analyzed (1 pipeline)
 
 | Pipeline | Reason |
 |----------|--------|
-| ESP32 | C/C++ requires SonarQube Developer Edition (sonar-cxx community plugin used for STM32) |
-| Windows | Runs on remote agent without SonarQube connectivity |
+| ESP32 | C/C++ requires SonarQube Developer Edition |
+
+> **Note:** Windows pipeline runs SonarQube analysis via a dedicated `Dockerfile.sonar` with dotnet-sonarscanner. STM32 uses the sonar-cxx community plugin. iOS uses sonar-apple.
 
 ---
 
