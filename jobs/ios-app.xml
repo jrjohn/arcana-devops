@@ -44,6 +44,7 @@
     environment {
         PROJECT_NAME = 'arcana-ios'
         VERSION      = '1.0.0'
+        MAC_PATH     = "/opt/homebrew/opt/ruby/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
         SONAR_TOKEN  = credentials('sonarqube-token')
         SONAR_HOST_URL = 'http://sonarqube:9000/sonarqube'
     }
@@ -59,7 +60,7 @@
                 withCredentials([usernamePassword(credentialsId: 'github-credentials',
                         usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS')]) {
                     sh '''
-                        export PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
+                        export PATH=${MAC_PATH}
                         if [ -d .git ]; then
                             git fetch --tags --force --progress \
                                 "https://${GIT_USER}:${GIT_PASS}@github.com/YOUR_ORG/arcana-ios.git" \
@@ -77,7 +78,7 @@
             agent { label 'macos' }
             steps {
                 sh '''
-                    export PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
+                    export PATH=${MAC_PATH}
                     xcodebuild -project arcana-ios.xcodeproj -scheme arcana-ios \
                         -configuration Release \
                         -destination 'generic/platform=iOS' \
@@ -89,7 +90,7 @@
             agent { label 'macos' }
             steps {
                 sh '''
-                    export PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
+                    export PATH=${MAC_PATH}
                     xcrun simctl boot "iPhone 17" 2&gt;/dev/null || true
                     XCRESULT=/tmp/arcana-ios-tests.xcresult
                     rm -rf "${XCRESULT}"
@@ -124,7 +125,6 @@
                 '''
             }
         }
-    }
         stage('Deploy to TestFlight') {
             agent { label 'macos' }
             steps {
@@ -135,7 +135,7 @@
                         string(credentialsId: 'asc-issuer-id', variable: 'ASC_ISSUER_ID')
                     ]) {
                         sh '''
-                            export PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
+                            export PATH=${MAC_PATH}
                             bundle install --quiet
                             bundle exec fastlane beta
                         '''
