@@ -27,7 +27,7 @@
         stage("Checkout") {
             steps {
                 dir("${env.PROJECTS_DIR}/arcana-react") {
-                    git url: 'https://github.com/YOUR_ORG/arcana-react.git',
+                    git url: 'https://github.com/jrjohn/arcana-react.git',
                         branch: 'main', credentialsId: 'github-credentials'
                 }
             }
@@ -60,8 +60,28 @@
                               -Dsonar.sources=src \
                               -Dsonar.exclusions=node_modules/**,build/**,dist/** \
                               -Dsonar.scm.disabled=true \
-                              -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info'''
+                              -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
+                              -Dsonar.coverage.exclusions=**/*.scss,**/*.css,**/*.json,src/test/**'''
                         }
+                    }
+                }
+            }
+        }
+        stage("Architecture Qube") {
+            steps {
+                dir("${env.PROJECTS_DIR}/arcana-react") {
+                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                        sh """
+                            mkdir -p arch-qube-reports
+                            docker run --rm \\
+                                --network devops_default \\
+                                -v \$(pwd):/project \\
+                                -v \$(pwd)/arch-qube-reports:/output \\
+                                arch-qube:latest scan /project \\
+                                --framework react --no-ai \\
+                                --ci --format json,markdown \\
+                                -o /output --threshold 90
+                        """
                     }
                 }
             }
@@ -82,7 +102,6 @@
         always  { echo "Build number ${BUILD_NUMBER} done" }
     }
 }
-
 </script>
     <sandbox>true</sandbox>
   </definition>
