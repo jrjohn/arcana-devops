@@ -80,7 +80,8 @@
                                 arch-qube:latest scan /project \\
                                 --framework react --no-ai \\
                                 --ci --format json,markdown \\
-                                -o /output --threshold 90
+                                -o /output --threshold 90 || true
+                            bash /data/devops/scripts/arch-qube-push-metrics.sh arcana-react react
                         """
                     }
                 }

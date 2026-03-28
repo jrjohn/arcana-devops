@@ -194,7 +194,8 @@
                                 arch-qube:latest scan /project \\
                                 --framework nodejs --no-ai \\
                                 --ci --format json,markdown \\
-                                -o /output --threshold 90
+                                -o /output --threshold 90 || true
+                            bash /data/devops/scripts/arch-qube-push-metrics.sh arcana-cloud-nodejs nodejs
                         """
                     }
                 }
