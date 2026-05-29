@@ -3,7 +3,7 @@
 [![Architecture Rating](https://img.shields.io/badge/Architecture%20Rating-⭐⭐⭐⭐%209.2%2F10-blue.svg)](#architecture-evaluation)
 ![Jenkins](https://img.shields.io/badge/Jenkins-LTS-red?style=flat-square&logo=jenkins)
 ![Docker](https://img.shields.io/badge/Docker-Compose%20v2-blue?style=flat-square&logo=docker)
-![Pipelines](https://img.shields.io/badge/Pipelines-15%20(15%20ALL%20GREEN)-success?style=flat-square)
+![Pipelines](https://img.shields.io/badge/Pipelines-14%20multibranch-success?style=flat-square)
 ![SonarQube](https://img.shields.io/badge/SonarQube-26.2.0%20(14%20projects%20%7C%20118K%20LOC)-informational?style=flat-square&logo=sonarqube)
 ![Nexus](https://img.shields.io/badge/Nexus-3.90.1%20(19%2B%20repos)-blueviolet?style=flat-square&logo=sonatype)
 ![Platforms](https://img.shields.io/badge/Platforms-5%20(Web%20%7C%20Embedded%20%7C%20Mobile%20%7C%20Desktop%20%7C%20Cloud)-blueviolet?style=flat-square)
@@ -11,9 +11,11 @@
 ![Dashboards](https://img.shields.io/badge/Dashboards-5%20pre--loaded-brightgreen?style=flat-square)
 ![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)
 
-Production-tested Jenkins CI/CD environment with 15 pre-built pipelines, SonarQube 26.2.0 code analysis (14 projects, 118K LOC, 14/14 zero issues), Nexus Repository Manager 3.90.1 (19+ proxy repos for artifact caching), Docker Registry, and a full monitoring stack (Prometheus + Grafana + Loki). One command to deploy.
+Production-tested Jenkins CI/CD environment with 14 multibranch pipelines, SonarQube 26.2.0 code analysis, Nexus Repository Manager 3.90.1 (19+ proxy repos for artifact caching), Docker Registry, and a full monitoring stack (Prometheus + Grafana + Loki). One command to deploy.
 
-**15 pipelines tested and verified — ALL GREEN** across Go, Rust, Vue, .NET, Spring Boot, Python/Flask, Node.js/Express, React, Angular, ESP32, STM32, Android, HarmonyOS, iOS, and Windows — covering web, cloud, embedded, and mobile platforms. **15/15 pipelines produce SUCCESS status** with all integration tests passing (Layered HTTP, Layered gRPC, K8s gRPC).
+**14 multibranch pipelines** across Go, Rust, Vue, Spring Boot, Python/Flask, Node.js/Express, React, Angular, ESP32, STM32, Android, HarmonyOS, iOS, and Windows — covering web, cloud, embedded, and mobile platforms. PR branches are auto-discovered and gated (tests / SonarQube quality gate / Architecture Qube), with mains pushed to the Docker Registry.
+
+> **Recent changes (2026-05-29):** Migrated to **multibranch-only** — the 15 legacy single-branch `*-app-pipeline` jobs were retired (kept `*-app-pipeline-mb`). The separate cross-platform `.NET` pipeline (`dotnet-app-pipeline-mb`) was consolidated away; **arcana-windows is now built solely by the native `windows-app-pipeline-mb`** (.106 Windows agent). The pipeline-ranking and SonarQube tables further below predate this migration and reflect the prior 15-pipeline layout. See [Backup & Disaster Recovery](#backup--disaster-recovery).
 
 ---
 
@@ -24,6 +26,7 @@ Production-tested Jenkins CI/CD environment with 15 pre-built pipelines, SonarQu
 - [Architecture Evaluation](#architecture-evaluation)
 - [Pipeline Ranking](#pipeline-ranking)
 - [Pipelines](#pipelines)
+- [Backup & Disaster Recovery](#backup--disaster-recovery)
 - [SonarQube Code Analysis](#sonarqube-code-analysis)
 - [Monitoring Dashboards](#monitoring-dashboards)
 - [Customization](#customization)
@@ -334,34 +337,33 @@ Each pipeline is evaluated on 6 dimensions: **Speed**, **Log Cleanliness**, **Co
 
 ## Pipelines
 
-All 15 pipelines are pre-loaded via Groovy init script on first boot:
+All 14 pipelines are **multibranch** (`WorkflowMultiBranchProject`) — each auto-discovers `main` + open PR branches from its GitHub repo and runs the repo's `Jenkinsfile`:
 
-| # | Pipeline | Type | Platform | SonarQube |
+| # | Pipeline (job) | Type | Platform | SonarQube |
 |---|----------|------|----------|-----------|
-| 1 | go-app-pipeline | Docker compose build + push | Cloud / Web | Go |
-| 2 | rust-app-pipeline | Docker compose build + push | Cloud / Web | Rust |
-| 3 | vue-app-pipeline | Docker compose build + push | Frontend | JS/TS/CSS |
-| 4 | dotnet-app-pipeline | Docker compose build + push | Cloud / Web | C# (dotnet-sonarscanner) |
-| 5 | springboot-app-pipeline | Docker compose build + push | Cloud / Web | Java/JS/XML |
-| 6 | python-app-pipeline | Docker compose build + push | Cloud / Web | Python |
-| 7 | node-app-pipeline | Docker compose build + push | Cloud / Web | TypeScript |
-| 8 | react-app-pipeline | Docker compose build + push | Frontend | TS/CSS |
-| 9 | angular-app-pipeline | Docker compose build + push | Frontend | TS/CSS/HTML |
-| 10 | esp32-app-pipeline | Docker compose run (embedded) | Embedded | Skip (C/C++) |
-| 11 | stm32-app-pipeline | Docker compose build | Embedded | C/C++ (sonar-cxx) |
-| 12 | android-app-pipeline | Docker compose build + run (amd64) | Mobile | Java/Kotlin |
-| 13 | harmonyos-app-pipeline | Docker compose build + run (amd64) | Mobile | JavaScript |
-| 14 | ios-app | Swift build + test (Mac agent) | Mobile | Swift (sonar-apple) |
-| 15 | windows-app-pipeline | dotnet build + test (Windows agent) | Desktop | Skip (remote) |
+| 1 | go-app-pipeline-mb | Docker compose build + push | Cloud / Web | Go |
+| 2 | rust-app-pipeline-mb | Docker compose build + push | Cloud / Web | Rust |
+| 3 | vue-app-pipeline-mb | Docker compose build + push | Frontend | JS/TS/CSS |
+| 4 | springboot-app-pipeline-mb | Docker compose build + push | Cloud / Web | Java/JS/XML |
+| 5 | python-app-pipeline-mb | Docker compose build + push | Cloud / Web | Python |
+| 6 | node-app-pipeline-mb | Docker compose build + push | Cloud / Web | TypeScript |
+| 7 | react-app-pipeline-mb | Docker compose build + push | Frontend | TS/CSS |
+| 8 | angular-app-pipeline-mb | Docker compose build + push | Frontend | TS/CSS/HTML |
+| 9 | esp32-app-pipeline-mb | Docker compose run (embedded) | Embedded | Skip (C/C++) |
+| 10 | stm32-app-pipeline-mb | Docker compose build | Embedded | C/C++ (sonar-cxx) |
+| 11 | android-app-pipeline-mb | Docker compose build + run (amd64) | Mobile | Java/Kotlin |
+| 12 | harmonyos-app-pipeline-mb | Docker compose build + run (amd64) | Mobile | JavaScript |
+| 13 | ios-app-mb | Swift build + test (Mac agent) | Mobile | Swift (sonar-apple) |
+| 14 | windows-app-pipeline-mb | .NET build + test (Windows agent, native) | Desktop / .NET | Skip (remote) |
 
-> **Note:** iOS and Windows pipelines require dedicated agents (Mac Mini / Windows machine). See [Adding SSH Agents](#adding-ssh-agents) below. ESP32 C/C++ analysis requires SonarQube Developer Edition. STM32 uses sonar-cxx, iOS uses sonar-apple, .NET uses dotnet-sonarscanner, HarmonyOS ArkTS is recognized as JavaScript.
+> **Note:** iOS and Windows pipelines require dedicated agents (Mac Mini / Windows .106 machine). See [Adding SSH Agents](#adding-ssh-agents) below. ESP32 C/C++ analysis requires SonarQube Developer Edition. STM32 uses sonar-cxx, iOS uses sonar-apple, HarmonyOS ArkTS is recognized as JavaScript. The former cross-platform `.NET` pipeline (`dotnet-app-pipeline-mb`, Jenkinsfile.dotnet) was retired 2026-05-29 — arcana-windows is built natively by `windows-app-pipeline-mb` (Jenkinsfile.windows) only.
 
 ### Pipeline Architecture
 
 ```mermaid
 graph TD
-    subgraph web ["Cloud / Web (6)"]
-        Go & Rust & SpringBoot & Python & NodeJS & DotNet
+    subgraph web ["Cloud / Web (5)"]
+        Go & Rust & SpringBoot & Python & NodeJS
     end
 
     subgraph frontend ["Frontend (3)"]
@@ -397,6 +399,39 @@ graph TD
     style mobile fill:#fce8e6,stroke:#d93025
     style desktop fill:#e6f4ea,stroke:#137333
 ```
+
+---
+
+## Backup & Disaster Recovery
+
+This repo doubles as the **versioned backup of the live Jenkins controller** (bluesea / arcana.boo). What's tracked:
+
+| Path | What | Source of truth |
+|------|------|-----------------|
+| `jobs/*.xml` | All 14 multibranch job configs (`config.xml`) | Exported from the live controller — refreshed 2026-05-29 |
+| `jenkins/casc.yml` | System config (JCasC): executors, security, global settings | Declarative — applied on boot |
+| `jenkins/plugins.txt` | Top-level plugin manifest (deps auto-resolved at build) | Declarative — `jenkins-plugin-cli` input |
+| `jenkins/plugins-installed.txt` | **Full resolved plugin freeze** (96 plugins + versions) | Snapshot of live instance — for audit / exact rebuild |
+| `jenkins/Dockerfile` | Custom controller image (LTS + sonar-scanner + Node) | Declarative |
+
+**Refresh the job backup** (after creating/deleting/editing jobs in the UI):
+
+```bash
+# from this repo, with the controller reachable
+for j in $(curl -s -u admin:admin "$JENKINS/api/json" | jq -r '.jobs[].name'); do
+  curl -s -u admin:admin "$JENKINS/job/$j/config.xml" > "jobs/$j.xml"
+done
+git add -A jobs && git commit -m "chore(backup): refresh Jenkins job configs"
+```
+
+**Restore a job** from backup:
+
+```bash
+curl -s -u admin:admin -H "Jenkins-Crumb:$CRUMB" -H "Content-Type:text/xml" \
+  --data-binary @jobs/<name>.xml "$JENKINS/createItem?name=<name>"
+```
+
+> Credentials/secrets are **never** committed (see `.gitignore` + `jenkins/secrets/`). Restore those from your secret store / JCasC env, not from git.
 
 ---
 
