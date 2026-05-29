@@ -3,7 +3,7 @@ WORKDIR /app
 COPY main.go .
 RUN go build -o server main.go
 
-FROM alpine:3.21
+FROM alpine:3.23
 WORKDIR /app
 COPY --from=builder /app/server .
 EXPOSE 8080
