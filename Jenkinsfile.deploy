@@ -1,0 +1,97 @@
+// devops-deploy-pipeline — GitOps-lite for the bluesea infra stack (2026-06-05).
+//
+// Watches arcana-devops main; when a merged change bumps an image TAG in a
+// compose file, applies the same tag surgically to the deployed copies under
+// /data/devops, pulls, recreates only the affected services, and verifies they
+// come back. Major-version bumps and image-name changes are listed but left
+// for a human (e.g. postgres 16->18 required dump/restore).
+//
+// Workflow-platform integration: any non-SUCCESS result here is picked up by
+// the global B2 RunListener, which opens a ci-flow BPMN instance (AI Triage ->
+// Build -> Fix -> Decide) on workflow.arcana.boo — no wiring needed in this file.
+pipeline {
+    agent any
+    options { disableConcurrentBuilds() }
+    triggers { pollSCM('H/10 * * * *') }
+    stages {
+        stage('Plan') {
+            steps {
+                script {
+                    sh '''
+                        docker run --rm \
+                          -v "$WORKSPACE":/repo:ro \
+                          -v /data/devops:/deployed:ro \
+                          python:3.12-alpine \
+                          python3 /repo/scripts/deploy/plan.py /repo /deployed > plan.json
+                        cat plan.json
+                    '''
+                    def plan = readJSON file: 'plan.json'
+                    env.APPLY_COUNT = plan.apply.size().toString()
+                    if (plan.skip) {
+                        def manual = plan.skip.collect { "${it.service}: ${it.reason}" }.join('; ')
+                        currentBuild.description = "manual needed → ${manual}"
+                        echo "SKIPPED (human required): ${manual}"
+                    }
+                    if (plan.apply.isEmpty()) {
+                        echo 'no auto-applicable tag changes — stack matches main'
+                    }
+                }
+            }
+        }
+        stage('Apply') {
+            when { expression { env.APPLY_COUNT != '0' } }
+            steps {
+                script {
+                    def plan = readJSON file: 'plan.json'
+                    for (item in plan.apply) {
+                        echo "deploy ${item.service}: ${item.from} -> ${item.to} (${item.file})"
+                        // helper mounts /data/devops at its HOST path so the compose
+                        // file's relative binds still resolve to real host paths
+                        sh """
+                            docker run --rm \
+                              -v /var/run/docker.sock:/var/run/docker.sock \
+                              -v /data/devops:/data/devops -w /data/devops \
+                              docker:cli sh -c '
+                                sed -i "s|image: *${item.from}|image: ${item.to}|" ${item.file} &&
+                                docker compose -p devops -f ${item.file} pull -q ${item.service} &&
+                                docker compose -p devops -f ${item.file} up -d --no-deps ${item.service}'
+                        """
+                    }
+                }
+            }
+        }
+        stage('Verify') {
+            when { expression { env.APPLY_COUNT != '0' } }
+            steps {
+                script {
+                    def plan = readJSON file: 'plan.json'
+                    for (item in plan.apply) {
+                        // container_name in this stack == service name
+                        sh """
+                            for i in \$(seq 1 30); do
+                              sleep 10
+                              ST=\$(docker inspect ${item.service} --format '{{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{else}}-{{end}}' 2>/dev/null || echo gone)
+                              echo "verify ${item.service}: \$ST"
+                              case "\$ST" in
+                                'running healthy'|'running -') exit 0 ;;
+                                gone|*exited*|*restarting*) [ \$i -ge 3 ] && exit 1 ;;
+                              esac
+                            done
+                            exit 1
+                        """
+                    }
+                }
+            }
+        }
+    }
+    post {
+        success {
+            script {
+                if (env.APPLY_COUNT != '0') {
+                    echo "deployed ${env.APPLY_COUNT} service update(s) — stack now matches main"
+                }
+            }
+        }
+        // failure/unstable: B2 global listener spawns a ci-flow instance automatically
+    }
+}
