@@ -13,13 +13,19 @@ pipeline {
     agent any
     options { disableConcurrentBuilds() }
     triggers { pollSCM('H/10 * * * *') }
+    environment {
+        // docker -v resolves paths on the HOST. $WORKSPACE is a path inside the
+        // jenkins container; its host-side location is under the jenkins_home
+        // bind (/data/docker/volumes/devops_jenkins_home/_data -> /var/jenkins_home).
+        HOST_WS = "/data/docker/volumes/devops_jenkins_home/_data/workspace/${env.JOB_NAME}"
+    }
     stages {
         stage('Plan') {
             steps {
                 script {
                     sh '''
                         docker run --rm \
-                          -v "$WORKSPACE":/repo:ro \
+                          -v "$HOST_WS":/repo:ro \
                           -v /data/devops:/deployed:ro \
                           python:3.12-alpine \
                           python3 /repo/scripts/deploy/plan.py /repo /deployed > plan.json
