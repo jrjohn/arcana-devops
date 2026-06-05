@@ -9,36 +9,45 @@
 // Workflow-platform integration: any non-SUCCESS result here is picked up by
 // the global B2 RunListener, which opens a ci-flow BPMN instance (AI Triage ->
 // Build -> Fix -> Decide) on workflow.arcana.boo — no wiring needed in this file.
+//
+// Plan protocol: scripts/deploy/plan.py prints TSV (APPLY/SKIP lines) — parsed
+// with core readFile; pipeline-utility-steps (readJSON) is not installed.
+
+def planLines() {
+    return readFile('plan.txt').split('\n').findAll { it.trim() }.collect { it.split('\t') }
+}
+
 pipeline {
     agent any
     options { disableConcurrentBuilds() }
     triggers { pollSCM('H/10 * * * *') }
     environment {
-        // docker -v resolves paths on the HOST. $WORKSPACE is a path inside the
-        // jenkins container; its host-side location is under the jenkins_home
-        // bind (/data/docker/volumes/devops_jenkins_home/_data -> /var/jenkins_home).
+        // docker -v resolves bind sources on the HOST. $WORKSPACE is a path in
+        // the jenkins container; its host-side location is under the
+        // jenkins_home bind (/data/docker/volumes/devops_jenkins_home/_data).
         HOST_WS = "/data/docker/volumes/devops_jenkins_home/_data/workspace/${env.JOB_NAME}"
     }
     stages {
         stage('Plan') {
             steps {
+                sh '''
+                    docker run --rm \
+                      -v "$HOST_WS":/repo:ro \
+                      -v /data/devops:/deployed:ro \
+                      python:3.12-alpine \
+                      python3 /repo/scripts/deploy/plan.py /repo /deployed > plan.txt
+                    cat plan.txt || true
+                '''
                 script {
-                    sh '''
-                        docker run --rm \
-                          -v "$HOST_WS":/repo:ro \
-                          -v /data/devops:/deployed:ro \
-                          python:3.12-alpine \
-                          python3 /repo/scripts/deploy/plan.py /repo /deployed > plan.json
-                        cat plan.json
-                    '''
-                    def plan = readJSON file: 'plan.json'
-                    env.APPLY_COUNT = plan.apply.size().toString()
-                    if (plan.skip) {
-                        def manual = plan.skip.collect { "${it.service}: ${it.reason}" }.join('; ')
+                    def rows = planLines()
+                    env.APPLY_COUNT = rows.count { it[0] == 'APPLY' }.toString()
+                    def skips = rows.findAll { it[0] == 'SKIP' }
+                    if (skips) {
+                        def manual = skips.collect { "${it[2]}: ${it[5]}" }.join('; ')
                         currentBuild.description = "manual needed → ${manual}"
                         echo "SKIPPED (human required): ${manual}"
                     }
-                    if (plan.apply.isEmpty()) {
+                    if (env.APPLY_COUNT == '0') {
                         echo 'no auto-applicable tag changes — stack matches main'
                     }
                 }
@@ -48,9 +57,10 @@ pipeline {
             when { expression { env.APPLY_COUNT != '0' } }
             steps {
                 script {
-                    def plan = readJSON file: 'plan.json'
-                    for (item in plan.apply) {
-                        echo "deploy ${item.service}: ${item.from} -> ${item.to} (${item.file})"
+                    for (row in planLines()) {
+                        if (row[0] != 'APPLY') { continue }
+                        def (FILE, SVC, FROM, TO) = [row[1], row[2], row[3], row[4]]
+                        echo "deploy ${SVC}: ${FROM} -> ${TO} (${FILE})"
                         // helper mounts /data/devops at its HOST path so the compose
                         // file's relative binds still resolve to real host paths
                         sh """
@@ -58,9 +68,9 @@ pipeline {
                               -v /var/run/docker.sock:/var/run/docker.sock \
                               -v /data/devops:/data/devops -w /data/devops \
                               docker:cli sh -c '
-                                sed -i "s|image: *${item.from}|image: ${item.to}|" ${item.file} &&
-                                docker compose -p devops -f ${item.file} pull -q ${item.service} &&
-                                docker compose -p devops -f ${item.file} up -d --no-deps ${item.service}'
+                                sed -i "s|image: *${FROM}|image: ${TO}|" ${FILE} &&
+                                docker compose -p devops -f ${FILE} pull -q ${SVC} &&
+                                docker compose -p devops -f ${FILE} up -d --no-deps ${SVC}'
                         """
                     }
                 }
@@ -70,17 +80,18 @@ pipeline {
             when { expression { env.APPLY_COUNT != '0' } }
             steps {
                 script {
-                    def plan = readJSON file: 'plan.json'
-                    for (item in plan.apply) {
+                    for (row in planLines()) {
+                        if (row[0] != 'APPLY') { continue }
+                        def SVC = row[2]
                         // container_name in this stack == service name
                         sh """
                             for i in \$(seq 1 30); do
                               sleep 10
-                              ST=\$(docker inspect ${item.service} --format '{{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{else}}-{{end}}' 2>/dev/null || echo gone)
-                              echo "verify ${item.service}: \$ST"
+                              ST=\$(docker inspect ${SVC} --format '{{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{else}}-{{end}}' 2>/dev/null || echo gone)
+                              echo "verify ${SVC}: \$ST"
                               case "\$ST" in
                                 'running healthy'|'running -') exit 0 ;;
-                                gone|*exited*|*restarting*) [ \$i -ge 3 ] && exit 1 ;;
+                                gone|*exited*) [ \$i -ge 3 ] && exit 1 ;;
                               esac
                             done
                             exit 1
@@ -98,6 +109,6 @@ pipeline {
                 }
             }
         }
-        // failure/unstable: B2 global listener spawns a ci-flow instance automatically
+        // failure/unstable: the B2 global listener spawns a ci-flow instance automatically
     }
 }

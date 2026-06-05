@@ -2,14 +2,13 @@
 """plan.py — diff image tags between repo compose files and the deployed copies.
 
 Usage: plan.py <repo-dir> <deployed-dir>
-Prints a JSON plan: {"apply": [...], "skip": [...]}.
+Prints one TSV line per drifted service: APPLY/SKIP (see main()).
 
 Only image TAG changes are auto-applied (surgical, preserves the deploy
 branch's local modifications — same procedure used manually for the
 2026-06-05 sonarqube/nexus upgrades). Major-version bumps and image-name
 changes are skipped for a human (e.g. postgres 16->18 needed dump/restore).
 """
-import json
 import re
 import sys
 
@@ -40,8 +39,10 @@ def major(tag):
 
 
 def main():
+    # TSV protocol (core readFile-parseable; no pipeline-utility-steps needed):
+    #   APPLY <file> <service> <from> <to>
+    #   SKIP  <file> <service> <from> <to> <reason>
     repo, deployed = sys.argv[1], sys.argv[2]
-    apply_, skip = [], []
     for f in FILES:
         want, have = images(f"{repo}/{f}"), images(f"{deployed}/{f}")
         for svc, wimg in want.items():
@@ -50,16 +51,12 @@ def main():
                 continue
             wname, _, wtag = wimg.rpartition(":")
             hname, _, htag = himg.rpartition(":")
-            item = {"file": f, "service": svc, "from": himg, "to": wimg}
             if wname != hname or not wtag or not htag:
-                item["reason"] = "image name changed — manual"
-                skip.append(item)
+                print(f"SKIP\t{f}\t{svc}\t{himg}\t{wimg}\timage name changed — manual")
             elif major(wtag) != major(htag):
-                item["reason"] = f"major bump {htag} -> {wtag} — manual (migration may be needed)"
-                skip.append(item)
+                print(f"SKIP\t{f}\t{svc}\t{himg}\t{wimg}\tmajor bump {htag} -> {wtag} — manual (migration may be needed)")
             else:
-                apply_.append(item)
-    print(json.dumps({"apply": apply_, "skip": skip}, indent=1))
+                print(f"APPLY\t{f}\t{svc}\t{himg}\t{wimg}")
 
 
 if __name__ == "__main__":
