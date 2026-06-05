@@ -12,9 +12,20 @@
 //
 // Plan protocol: scripts/deploy/plan.py prints TSV (APPLY/SKIP lines) — parsed
 // with core readFile; pipeline-utility-steps (readJSON) is not installed.
+//
+// NO closures on collections here: Groovy CPS silently mis-evaluates several
+// closure overloads (count{} returned 0 in run #3; findAll/collect over the
+// String[] from split() returned [] in run #4). Plain for-loops only.
 
-def planLines() {
-    return readFile('plan.txt').split('\n').findAll { it.trim() }.collect { it.split('\t') }
+def planRows(String kind) {
+    def rows = []
+    for (line in readFile('plan.txt').split('\n')) {
+        def t = line.trim()
+        if (!t) { continue }
+        def p = t.split('\t')
+        if (p[0] == kind) { rows.add(p) }
+    }
+    return rows
 }
 
 pipeline {
@@ -39,16 +50,15 @@ pipeline {
                     cat plan.txt || true
                 '''
                 script {
-                    def rows = planLines()
-                    // NOT .count{} — Groovy CPS silently mis-evaluates closure
-                    // overloads of count (returned 0 for a non-empty plan, run #3)
-                    env.APPLY_COUNT = rows.findAll { it[0] == 'APPLY' }.size().toString()
-                    def skips = rows.findAll { it[0] == 'SKIP' }
+                    env.APPLY_COUNT = planRows('APPLY').size().toString()
+                    def skips = planRows('SKIP')
                     if (skips) {
-                        def manual = skips.collect { "${it[2]}: ${it[5]}" }.join('; ')
+                        def manual = ''
+                        for (s in skips) { manual += "${s[2]}: ${s[5]}; " }
                         currentBuild.description = "manual needed → ${manual}"
                         echo "SKIPPED (human required): ${manual}"
                     }
+                    echo "plan: ${env.APPLY_COUNT} auto-applicable, ${skips.size()} manual"
                     if (env.APPLY_COUNT == '0') {
                         echo 'no auto-applicable tag changes — stack matches main'
                     }
@@ -59,9 +69,8 @@ pipeline {
             when { expression { env.APPLY_COUNT != '0' } }
             steps {
                 script {
-                    for (row in planLines()) {
-                        if (row[0] != 'APPLY') { continue }
-                        def (FILE, SVC, FROM, TO) = [row[1], row[2], row[3], row[4]]
+                    for (row in planRows('APPLY')) {
+                        def FILE = row[1]; def SVC = row[2]; def FROM = row[3]; def TO = row[4]
                         echo "deploy ${SVC}: ${FROM} -> ${TO} (${FILE})"
                         // helper mounts /data/devops at its HOST path so the compose
                         // file's relative binds still resolve to real host paths
@@ -82,8 +91,7 @@ pipeline {
             when { expression { env.APPLY_COUNT != '0' } }
             steps {
                 script {
-                    for (row in planLines()) {
-                        if (row[0] != 'APPLY') { continue }
+                    for (row in planRows('APPLY')) {
                         def SVC = row[2]
                         // container_name in this stack == service name
                         sh """
