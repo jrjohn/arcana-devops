@@ -40,7 +40,9 @@ pipeline {
                 '''
                 script {
                     def rows = planLines()
-                    env.APPLY_COUNT = rows.count { it[0] == 'APPLY' }.toString()
+                    // NOT .count{} — Groovy CPS silently mis-evaluates closure
+                    // overloads of count (returned 0 for a non-empty plan, run #3)
+                    env.APPLY_COUNT = rows.findAll { it[0] == 'APPLY' }.size().toString()
                     def skips = rows.findAll { it[0] == 'SKIP' }
                     if (skips) {
                         def manual = skips.collect { "${it[2]}: ${it[5]}" }.join('; ')
