@@ -70,7 +70,12 @@ services:
       POSTGRES_PASSWORD: "${SONAR_DB_PASSWORD:-sonarqube}"
       POSTGRES_DB: sonarqube
     volumes:
-      - sonarqube_db:/var/lib/postgresql/data
+      # postgres 18+ images moved the default PGDATA to a version-scoped subdir
+      # under /var/lib/postgresql — mount the PARENT, not .../data, or initdb
+      # writes outside the volume and data vanishes on container recreate.
+      # Major-version upgrades (16->18) need dump/restore: pg_dumpall on the old
+      # image, fresh volume on the new one, psql restore (done 2026-06-05).
+      - sonarqube_db:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${SONAR_DB_USER:-sonarqube}"]
       interval: 10s
