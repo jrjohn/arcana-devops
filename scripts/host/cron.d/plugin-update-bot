@@ -1,0 +1,4 @@
+SHELL=/bin/bash
+PATH=/usr/local/bin:/usr/bin:/bin
+# Weekly Jenkins plugin update PR (Renovate-style). 2026-06-05.
+30 6 * * 1 root /usr/local/bin/plugin-update-bot.sh
