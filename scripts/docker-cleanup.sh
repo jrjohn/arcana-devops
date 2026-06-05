@@ -52,7 +52,7 @@ docker exec registry bin/registry garbage-collect /etc/docker/registry/config.ym
 
 # 3. Prune unused images (older than 24h to avoid deleting active builds)
 echo "[3] Pruning unused images..." >> "$LOG"
-docker image prune -a -f --filter 'until=24h' >> "$LOG" 2>&1
+docker image prune -a -f --filter 'until=6h' >> "$LOG" 2>&1
 
 # 4. Prune build cache
 echo "[4] Pruning build cache..." >> "$LOG"

@@ -1,0 +1,4 @@
+SHELL=/bin/bash
+PATH=/usr/local/bin:/usr/bin:/bin
+# CI disk GC every 20 min — bound build-N image accumulation. 2026-05-29.
+*/20 * * * * root /usr/local/bin/ci-disk-gc.sh >> /var/log/ci-disk-gc.log 2>&1

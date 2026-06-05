@@ -1,0 +1,4 @@
+SHELL=/bin/bash
+PATH=/usr/local/bin:/usr/bin:/bin
+# CI remediation spool (hole #2 agent actuation) every 1 min. 2026-05-29.
+* * * * * root /usr/local/bin/ci-remediate-spool.sh >> /var/log/ci-remediate.log 2>&1

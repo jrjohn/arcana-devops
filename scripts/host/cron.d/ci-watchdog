@@ -1,0 +1,4 @@
+SHELL=/bin/bash
+PATH=/usr/local/bin:/usr/bin:/bin
+# CI substrate watchdog (hole #1) every 15 min. 2026-05-29.
+*/15 * * * * root /usr/local/bin/ci-watchdog.sh >> /var/log/ci-watchdog.log 2>&1
