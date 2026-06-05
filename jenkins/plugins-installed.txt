@@ -1,8 +1,7 @@
 # Jenkins installed-plugin freeze snapshot (full resolved set incl. transitive deps)
 # Source: bluesea (arcana.boo) live instance — for disaster recovery / audit.
 # The build manifest is plugins.txt (top-level only); this file is the resolved lock.
-# Snapshot generated 2026-05-29.
-
+# Snapshot refreshed 2026-06-05 (added: lockable-resources; dep-bumped: mailer).
 ansicolor:536.v13fa_b_860c267
 antisamy-markup-formatter:173.v680e3a_b_69ff3
 apache-httpcomponents-client-4-api:4.5.14-269.vfa_2321039a_83
@@ -50,7 +49,8 @@ json-api:20251224-185.v0cc18490c62c
 json-path-api:3.0.0-218.vcd4dd1355de2
 jsoup:1.22.1-76.v9cdb_2456c0e3
 junit:1402.va_87fd3d15dc3
-mailer:525.v2458b_d8a_1a_71
+lockable-resources:1524.v2c727b_b_e56ef
+mailer:534.v1b_36f5864073
 matrix-auth:3.2.10
 matrix-project:870.v9db_fcfc2f45b_
 metrics:4.2.37-494.v06f9a_939d33a_
