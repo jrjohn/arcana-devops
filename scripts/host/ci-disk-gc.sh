@@ -82,4 +82,21 @@ for line in out.splitlines():
 # are metadata-only; stage `down` removes its own.
 PYEOF
 
+# DEAD-BRANCH CACHE-VOLUME REAPER (2026-06-06): per-branch gradle/cargo cache
+# volumes (<mb-job>_<branch>_<cache>) outlive their PRs — the branch job goes
+# disabled/missing after merge+prune but the volume stays forever (rust PR-15
+# et al. held ~3G). Reap volumes whose Jenkins branch job is dead.
+JC=$(cat /etc/ci-jenkins-cred 2>/dev/null)
+if [ -n "$JC" ]; then
+  for v in $(docker volume ls -q | grep -E "^[a-z0-9-]+-mb_" 2>/dev/null); do
+    job=${v%%_*}; rest=${v#*_}; branch=${rest%%_*}; jb=$branch
+    case "$branch" in pr-*) jb="PR-${branch#pr-}";; esac
+    resp=$(curl -sm 10 -u "$JC" "http://localhost:8080/jenkins/job/$job/job/$jb/api/json?tree=color" 2>/dev/null)
+    case "$resp" in
+      *disabled*|"")
+        docker volume rm "$v" >/dev/null 2>&1 && echo "reaped dead-branch volume $v" ;;
+    esac
+  done
+fi
+
 echo "=== $(date '+%F %T') ci-disk-gc done (free=$(free_g)G) ==="
