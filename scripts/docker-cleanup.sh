@@ -47,6 +47,13 @@ for t in (data.get('tags') or []):
 done
 
 # 2. Registry garbage collection (remove unreferenced blobs)
+# ⚠ --delete-untagged strips the child manifests of buildx OCI INDEXES (the
+# attestation/provenance children have no tag of their own), turning `latest`
+# into a dangling index whose pulls 404 (2026-06-07: silently broke arch-qube
+# across all pipelines the day after a rebuild). RULE: any image pushed to this
+# registry must be a SINGLE manifest, not an index — build with
+# `--provenance=false --sbom=false` (see arcana-arch-qube/build-and-push.sh).
+# Single manifests are immune; their layers are referenced by the tagged manifest.
 echo "[2] Registry garbage collection..." >> "$LOG"
 docker exec registry bin/registry garbage-collect /etc/docker/registry/config.yml --delete-untagged >> "$LOG" 2>&1
 
