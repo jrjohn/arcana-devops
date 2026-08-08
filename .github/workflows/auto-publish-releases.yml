@@ -1,0 +1,43 @@
+name: auto-publish-releases
+
+# Fleet-wide auto-publish. release-please opens a "chore(main): release X.Y.Z" PR
+# in each product repo when there are releasable commits. This scheduled job merges
+# any such PR that is green, so the target repo's own release-please workflow then
+# cuts the tag + GitHub release.
+#
+# Why a PAT (RELEASE_PLEASE_TOKEN) and not GITHUB_TOKEN: a merge performed with the
+# built-in GITHUB_TOKEN does NOT trigger other workflows (GitHub loop-prevention),
+# so the tag-cut would never fire. A PAT's merge does trigger it.
+#
+# NOTE: GitHub disables scheduled workflows after 60 days of NO commits to THIS repo
+# (it emails an admin warning first). Any commit here, or a manual "Run workflow",
+# re-arms the schedule.
+
+on:
+  schedule:
+    - cron: '23 * * * *'   # hourly at :23
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Merge green release PRs across the fleet
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+        run: |
+          set -u
+          repos="ios android angular react vue windows harmonyos cloud-go cloud-nodejs cloud-python cloud-rust cloud-springboot embedded-esp32 embedded-stm32 arch-qube"
+          for r in $repos; do
+            R="jrjohn/arcana-$r"
+            pr=$(gh pr list -R "$R" --state open --json number,title,mergeStateStatus \
+                  --jq '[.[] | select(.title|startswith("chore(main): release")) | select(.mergeStateStatus=="CLEAN")][0].number // empty' 2>/dev/null)
+            if [ -n "${pr:-}" ]; then
+              echo "publishing $R release PR #$pr"
+              gh pr merge "$pr" -R "$R" --squash --admin || echo "  merge failed for $R #$pr"
+            else
+              echo "$R: no green release PR"
+            fi
+          done
