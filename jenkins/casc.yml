@@ -75,6 +75,36 @@ credentials:
               username: "${GITHUB_USER:-your-user}"
               password: "${GITHUB_TOKEN}"
               description: "GitHub PAT for SCM polling"
+          # --- Android / Play signing (backported from live 2026-08). Values are
+          # supplied via env at deploy — never in the repo. `file` creds take the
+          # base64 of the file in *_B64. See .env.example. ---
+          - file:
+              scope: GLOBAL
+              id: "android-keystore"
+              fileName: "release.keystore"
+              secretBytes: "${ANDROID_KEYSTORE_B64}"
+              description: "Android release keystore (base64 in ANDROID_KEYSTORE_B64)"
+          - string:
+              scope: GLOBAL
+              id: "android-key-alias"
+              secret: "${ANDROID_KEY_ALIAS}"
+              description: "Android signing key alias"
+          - string:
+              scope: GLOBAL
+              id: "android-key-password"
+              secret: "${ANDROID_KEY_PASSWORD}"
+              description: "Android signing key password"
+          - string:
+              scope: GLOBAL
+              id: "android-store-password"
+              secret: "${ANDROID_STORE_PASSWORD}"
+              description: "Android keystore store password"
+          - file:
+              scope: GLOBAL
+              id: "google-play-key"
+              fileName: "google-play-key.json"
+              secretBytes: "${GOOGLE_PLAY_KEY_B64}"
+              description: "Google Play service-account JSON key (base64 in GOOGLE_PLAY_KEY_B64)"
 
 unclassified:
   cspConfiguration:
