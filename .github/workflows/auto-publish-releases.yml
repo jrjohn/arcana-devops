@@ -36,7 +36,7 @@ jobs:
                   --jq '[.[] | select(.title|startswith("chore(main): release")) | select(.mergeStateStatus=="CLEAN")][0].number // empty' 2>/dev/null)
             if [ -n "${pr:-}" ]; then
               echo "publishing $R release PR #$pr"
-              gh pr merge "$pr" -R "$R" --squash --admin || echo "  merge failed for $R #$pr"
+              gh pr merge "$pr" -R "$R" --squash || echo "  merge failed for $R #$pr"
             else
               echo "$R: no green release PR"
             fi
