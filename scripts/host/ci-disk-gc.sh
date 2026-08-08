@@ -77,9 +77,35 @@ for line in out.splitlines():
     if (now - dt).total_seconds() > 7200:
         subprocess.run(["docker","rm","-f",name.strip()],capture_output=True)
         print(f"reaped stale test container {name.strip()}")
-# NOTE: deliberately NOT pruning networks — the 2026-05-29 lesson stands
-# (network prune races compose builds; killed rust main #11 net). Idle nets
-# are metadata-only; stage `down` removes its own.
+# NETWORK REAPER (2026-08-08): the old "idle nets are metadata-only" belief was
+# WRONG. Each idle net still holds a full /16, and the Docker default pool
+# (172.17-172.31, ~15 nets) exhausts — `compose build` then dies with
+# "all predefined address pools have been fully subnetted" (node-app PR-102 stuck
+# a release a full day). Blanket `network prune` races builds (2026-05-29 killed
+# rust main #11), so reap AGE-BASED exactly like the containers above: only
+# CI-named nets, 0 attached containers, >2h old. An active build's net is minutes
+# old AND has containers, so it is never touched — no race.
+netout = subprocess.run(["docker","network","ls","--format","{{.Name}}"],
+                        capture_output=True,text=True).stdout
+for name in netout.split():
+    if not re.search(r"(-pipeline-mb_|arcana-ci-)", name):
+        continue
+    insp = subprocess.run(["docker","network","inspect","-f",
+                           "{{len .Containers}}\t{{.Created}}", name],
+                          capture_output=True,text=True).stdout.strip()
+    if "\t" not in insp:
+        continue
+    ncont, created = insp.split("\t",1)
+    if ncont != "0":                       # attached to a container → in use, skip
+        continue
+    cm = re.match(r"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})", created.strip())
+    if not cm:
+        continue
+    cdt = datetime.datetime.strptime(cm.group(1), "%Y-%m-%dT%H:%M:%S").replace(
+        tzinfo=datetime.timezone.utc)
+    if (now - cdt).total_seconds() > 7200:
+        subprocess.run(["docker","network","rm",name],capture_output=True)
+        print(f"reaped stale CI network {name}")
 PYEOF
 
 # DEAD-BRANCH CACHE-VOLUME REAPER (2026-06-06): per-branch gradle/cargo cache
