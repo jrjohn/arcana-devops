@@ -81,9 +81,23 @@ unclassified:
     enforce: true
   location:
     url: "${JENKINS_URL:-https://your-domain.com/jenkins/}"
+  gitHubPluginConfig:
+    # Backported from live 2026-08 — was set in the UI, absent from IaC, so a fresh
+    # deploy left the GitHub webhook URL unset. Derived from the same JENKINS_URL env.
+    hookUrl: "${JENKINS_URL:-https://your-domain.com/jenkins/}github-webhook/"
   sonarGlobalConfiguration:
     buildWrapperEnabled: true
     installations:
       - name: "SonarQube"
         serverUrl: "${SONAR_HOST_URL:-http://sonarqube:9000/sonarqube}"
         credentialsId: "sonarqube-token"
+
+security:
+  scriptApproval:
+    # Backported from live 2026-08 — approved in the UI, absent from IaC, so a fresh
+    # deploy blocks pipelines using these until re-approved by hand.
+    approvedSignatures:
+      - "method hudson.model.Run getLog int"
+      - "method org.jenkinsci.plugins.workflow.support.steps.build.RunWrapper getRawBuild"
+    approvedScriptHashes:
+      - "SHA512:f68d11bc5ef08114dd0490e5113e1b9439385cf1044871b5606ac3f0bd8938b8cfd866b8278aee95d0c1a983d17d8bef78ff9015b9c1cb2a968cba2d37919cee"
