@@ -11,7 +11,7 @@ set -u
 LOG=/var/log/ci-watchdog.log
 REM=/usr/local/bin/ci-remediate.sh
 J="http://localhost:8080/jenkins"; JC="$(cat /etc/ci-jenkins-cred 2>/dev/null)"  # user:token, chmod 600, host-only — never commit credentials
-STALE_HOURS=5            # hourly fast-loop → >5h since last successful run = problem
+STALE_HOURS=26           # daily cron (0 9 * * *) -> >26h since last successful run = stuck (was 5: stale hourly-era threshold that false-alarmed every afternoon)
 DISK_WARN_PCT=88         # /data used% that triggers a prune
 KEY_FILE=/data/projects/daily-ci-agent/claude-home/.sendgrid-key
 ALERTS=""
@@ -101,6 +101,19 @@ if docker ps --format '{{.Names}}' | grep -qx sonarqube && [ "${UP:-0}" -lt 90 ]
     log "ES shows recent flood w/o release while disk ok -> restart sonarqube"
     "$REM" restart-sonarqube >/dev/null 2>&1 || add_alert "SonarQube ES appears read-only-stuck and restart failed."
   fi
+fi
+
+# ── check 7: renovate-agent health (2026-06-05) ───────────────────────────
+# The 07:00 dependency-update run failed silently (containerd lease error after
+# the 6/4 disk incident) — nothing watched its rc. Alert when the last run
+# failed or no successful run has landed in >26h (daily cadence + slack).
+RBASE=/data/projects/renovate-agent
+RRC=$(cat "$RBASE/last-rc" 2>/dev/null || echo 0)
+RLS=$(cat "$RBASE/last-success" 2>/dev/null || echo 0)
+if [ "$RRC" != 0 ]; then
+  add_alert "renovate-agent last run FAILED (rc=$RRC) — dependency PRs are not being generated. See $RBASE/logs/."
+elif [ $(( $(date +%s) - RLS )) -gt 93600 ]; then
+  add_alert "renovate-agent has had no successful run in >26h — cron dead or runs hanging. See $RBASE/logs/."
 fi
 
 # ── send alert email if anything unresolved (deduped: same alert-set max 1/6h) ─

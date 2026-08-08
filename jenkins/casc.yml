@@ -1,6 +1,6 @@
 jenkins:
   systemMessage: "Jenkins DevOps Starter Kit — Managed by JCasC"
-  numExecutors: 4
+  numExecutors: 1
   mode: NORMAL
   disabledAdministrativeMonitors:
     - "jenkins.diagnostics.ControllerExecutorsAgents"
