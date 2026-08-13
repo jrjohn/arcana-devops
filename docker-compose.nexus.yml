@@ -1,6 +1,6 @@
 services:
   nexus:
-    image: sonatype/nexus3:3.93.0
+    image: sonatype/nexus3:3.95.1
     container_name: nexus
     ports:
       - "127.0.0.1:8081:8081"
