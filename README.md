@@ -293,7 +293,7 @@ Each pipeline is evaluated on 6 dimensions: **Speed**, **Log Cleanliness**, **Co
 | Rank | Pipeline | Score | Speed | Logs | Analysis | Stages | Pros | Cons |
 |------|----------|-------|-------|------|----------|--------|------|------|
 | 1 | **Go** | 9.8 | 12s | CLEAN | Full (0 bugs, 0 vulns) | 6 | Fastest pipeline, zero SonarQube issues, perfect logs, fully Dockerized, integration tests (HTTP + gRPC + K8s) pass | Minimal codebase (31 LOC) |
-| 2 | **Rust** | 9.5 | 13s | CLEAN | Full (19K LOC) | 6 | Near-instant build, largest codebase analyzed, new Rust language support in SonarQube 26.2 | Clippy disabled (no cargo on host), 2 vulns / 3 smells in code |
+| 2 | **Rust** | 9.5 | 13s | CLEAN | Full (19K LOC) | 6 | Near-instant build, largest codebase analyzed, new Rust language support in SonarQube 26.2, Clippy lints imported into SonarQube (the test lane writes `cargo clippy --message-format=json`, the scan reads it via `sonar.rust.clippyReport.reportPaths`) | The scanner cannot run Clippy itself (no cargo in the Jenkins container), 2 vulns / 3 smells in code |
 | 3 | **Spring Boot** | 9.3 | 38s | CLEAN | Full (6.4K LOC) | 6 | Fast cached build, clean logs, multi-language analysis (Java/TS/CSS/YAML), integration tests pass | Java bytecode not available for deeper analysis (sonar.java.binaries workaround) |
 
 ### Tier A — Excellent Pipeline
