@@ -108,6 +108,18 @@ for name in netout.split():
         print(f"reaped stale CI network {name}")
 PYEOF
 
+# ANON-VOLUME REAPER (2026-09-23): stages like `docker create -v /src -v /output ...` followed
+# by `docker rm -f` (no -v) leave one anonymous volume per build. 149 of them (28G) piled up
+# and /data hit 98% on 2026-09-23 — go PR-84 died with "no space left on device". Remove
+# only DANGLING ANONYMOUS volumes (64-hex names, referenced by no container); named volumes
+# (kogito-pgdata, gradle/cargo caches, ...) are never touched here. A running build's
+# container still references its volumes, so they are not dangling.
+n=0
+for v in $(docker volume ls -qf dangling=true 2>/dev/null | grep -E '^[0-9a-f]{64}$'); do
+  docker volume rm "$v" >/dev/null 2>&1 && n=$((n+1))
+done
+echo "anonymous volumes removed: $n"
+
 # DEAD-BRANCH CACHE-VOLUME REAPER (2026-06-06): per-branch gradle/cargo cache
 # volumes (<mb-job>_<branch>_<cache>) outlive their PRs — the branch job goes
 # disabled/missing after merge+prune but the volume stays forever (rust PR-15
