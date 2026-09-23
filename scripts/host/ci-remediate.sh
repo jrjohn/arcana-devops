@@ -17,7 +17,12 @@ JC="$(cat /etc/ci-jenkins-cred 2>/dev/null)"  # user:token, chmod 600, host-only
 LOG=/var/log/ci-remediate.log
 log(){ echo "$(date '+%F %T') [remediate] $*" >> "$LOG"; }
 free_g(){ df -BG --output=avail /data | tail -1 | tr -dc 0-9; }
-builds_running(){ curl -s -u "$JC" "$J/computer/api/json" 2>/dev/null | python3 -c "import sys,json;print(sum(1 for c in json.load(sys.stdin)['computer'] for e in c.get('executors',[]) if e.get('currentExecutable')))" 2>/dev/null || echo 1; }
+# builds_running MUST request currentExecutable explicitly: the plain computer/api/json
+# returns every executor as an empty {} (depth 0), so this always counted 0 builds and the
+# "<15G free and 0 builds running -> image prune -af" tier wiped images of RUNNING builds
+# (2026-09-23: springboot PR-180 lost its build-1 image mid unit-tests, then failed pulling
+# a broken copy from the registry). Verified: old query -> 0, this query -> 2 with 2 running.
+builds_running(){ curl -s -u "$JC" "$J/computer/api/json?tree=computer%5Bexecutors%5BcurrentExecutable%5Burl%5D%5D%5D" 2>/dev/null | python3 -c "import sys,json;print(sum(1 for c in json.load(sys.stdin)['computer'] for e in c.get('executors',[]) if e.get('currentExecutable')))" 2>/dev/null || echo 1; }
 jpost(){ # jpost <path> ; POST with crumb+cookie
   local cj; cj=$(mktemp)
   local cr; cr=$(curl -s -c "$cj" -u "$JC" "$J/crumbIssuer/api/json" 2>/dev/null | python3 -c "import sys,json;print(json.load(sys.stdin)['crumb'])" 2>/dev/null)
