@@ -176,15 +176,33 @@ for name in out:
 
 # 2. PR test images of closed PRs
 cred = os.environ.get("JC","").strip()
-def jenkins_color(job, branch):
+def jenkins_get(path):
     if not cred: return None
-    req = urllib.request.Request(f"http://localhost:8080/jenkins/job/{job}/job/{branch}/api/json?tree=color")
+    req = urllib.request.Request(f"http://localhost:8080/jenkins/{path}")
     req.add_header("Authorization", "Basic " + base64.b64encode(cred.encode()).decode())
     try:
         with urllib.request.urlopen(req, timeout=10) as r:
             return r.read().decode()
     except Exception:
         return None        # 404 / unreachable -> unknown, never "closed"
+# Jenkins shortens long multibranch workspace dirs by cutting from the FRONT, and compose
+# names the project after that dir: springboot-app-pipeline-mb_PR-183 became
+# `pringboot-app-pipeline-mb_pr-183-test`. Map such a prefix back to the one real job
+# whose name ends with it (ambiguous or no match -> unknown -> kept).
+_jobs = None
+def resolve_job(job):
+    global _jobs
+    if _jobs is None:
+        import json
+        raw = jenkins_get("api/json?tree=jobs[name]")
+        _jobs = [j["name"] for j in json.loads(raw)["jobs"]] if raw else []
+    if job in _jobs:
+        return job
+    hits = [j for j in _jobs if j.endswith(job)]
+    return hits[0] if len(hits) == 1 else None
+def jenkins_color(job, branch):
+    real = resolve_job(job)
+    return jenkins_get(f"job/{real}/job/{branch}/api/json?tree=color") if real else None
 imgs = subprocess.run(["docker","images","--format","{{.Repository}}:{{.Tag}}\t{{.CreatedAt}}"],
                       capture_output=True, text=True).stdout
 for line in imgs.splitlines():
@@ -201,6 +219,9 @@ for line in imgs.splitlines():
         print(f"removed {ref.strip()} ({why})")
 PYEOF
 docker image prune -f >/dev/null 2>&1
+# BuildKit cache is never touched by `image prune`; it reached 23 GB. Only entries
+# unused for 24h go, so a running build's cache (seconds/minutes old) is kept.
+docker builder prune -f --filter until=24h 2>/dev/null | tail -1 | sed 's/^/build cache reclaimed: /'
 
 # LOG CAP (2026-09-14): docker json-file logs have no max-size on this host (daemon-wide
 # log-opts would need a dockerd restart). sf-ci grew to 1.4 GB of repeated stack traces and
