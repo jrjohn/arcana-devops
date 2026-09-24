@@ -103,7 +103,10 @@ for name in netout.split():
         continue
     cdt = datetime.datetime.strptime(cm.group(1), "%Y-%m-%dT%H:%M:%S").replace(
         tzinfo=datetime.timezone.utc)
-    if (now - cdt).total_seconds() > 7200:
+    # 2026-09-14: 2h was too slow on a busy day — 20+ PR/main builds inside 2h left every
+    # net younger than the cutoff and the pool exhausted again (python/node main failed with
+    # "fully subnetted"). 1h is still far past any build step gap; an in-use net has containers.
+    if (now - cdt).total_seconds() > 3600:
         subprocess.run(["docker","network","rm",name],capture_output=True)
         print(f"reaped stale CI network {name}")
 PYEOF
@@ -136,5 +139,81 @@ if [ -n "$JC" ]; then
     esac
   done
 fi
+
+# PR-IMAGE + LEFTOVER-TEST-CONTAINER REAPER (2026-09-24): each PR build leaves a
+# `<job>_pr-<N>-test:latest` image (rust 4.5 GB, springboot/angular ~2 GB). The build-N
+# rule above only matches `:build-N` tags, so these were never removed — 6 closed-PR
+# images plus 4 exited test containers (angular-test-35 held one for 5 days) had eaten
+# ~19 GB and /data sat at 89%. Two steps, both conservative:
+#  1. exited CI test containers named `<something>-test-<N>` that finished >2h ago
+#     (Jenkins normally `docker rm`s them; they survive only when a build is killed).
+#  2. PR images whose Jenkins branch job is `disabled` (PR closed/merged), or that are
+#     >7 days old (covers job names Jenkins cannot resolve). `docker rmi` without -f,
+#     so an image still used by any container is refused and kept.
+GC_DRY=${GC_DRY:-0} JC="$(cat /etc/ci-jenkins-cred 2>/dev/null)" python3 - <<'PYEOF'
+import subprocess, re, datetime, os, base64, urllib.request
+dry = os.environ.get("GC_DRY") == "1"
+now = datetime.datetime.now(datetime.timezone.utc)
+def ts(s):
+    m = re.match(r"(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2})", s.strip())
+    return datetime.datetime.strptime(m.group(1)+" "+m.group(2), "%Y-%m-%d %H:%M:%S").replace(tzinfo=datetime.timezone.utc) if m else None
+def run(cmd):
+    if dry:
+        print("DRY:", " ".join(cmd)); return True
+    return subprocess.run(cmd, capture_output=True, text=True).returncode == 0
+
+# 1. leftover exited test containers
+out = subprocess.run(["docker","ps","-a","--filter","status=exited","--format","{{.Names}}"],
+                     capture_output=True, text=True).stdout.split()
+for name in out:
+    if not re.fullmatch(r"[a-z0-9-]+-test-\d+", name):
+        continue
+    fin = subprocess.run(["docker","inspect","-f","{{.State.FinishedAt}}",name],
+                         capture_output=True, text=True).stdout
+    dt = ts(fin)   # FinishedAt is UTC (RFC3339 Z)
+    if dt and (now - dt).total_seconds() > 7200 and run(["docker","rm",name]):
+        print(f"reaped leftover test container {name}")
+
+# 2. PR test images of closed PRs
+cred = os.environ.get("JC","").strip()
+def jenkins_color(job, branch):
+    if not cred: return None
+    req = urllib.request.Request(f"http://localhost:8080/jenkins/job/{job}/job/{branch}/api/json?tree=color")
+    req.add_header("Authorization", "Basic " + base64.b64encode(cred.encode()).decode())
+    try:
+        with urllib.request.urlopen(req, timeout=10) as r:
+            return r.read().decode()
+    except Exception:
+        return None        # 404 / unreachable -> unknown, never "closed"
+imgs = subprocess.run(["docker","images","--format","{{.Repository}}:{{.Tag}}\t{{.CreatedAt}}"],
+                      capture_output=True, text=True).stdout
+for line in imgs.splitlines():
+    ref, _, created = line.partition("\t")
+    m = re.fullmatch(r"([a-z0-9-]+-pipeline-mb)_pr-(\d+)-[a-z0-9_-]+:latest", ref.strip())
+    if not m:
+        continue
+    job, pr = m.group(1), m.group(2)
+    color = jenkins_color(job, f"PR-{pr}")
+    dt = ts(created)
+    age_d = (now - dt).total_seconds()/86400 if dt else 0
+    why = "PR closed (job disabled)" if color and '"disabled"' in color else ("older than 7d" if age_d > 7 else None)
+    if why and run(["docker","rmi",ref.strip()]):
+        print(f"removed {ref.strip()} ({why})")
+PYEOF
+docker image prune -f >/dev/null 2>&1
+
+# LOG CAP (2026-09-14): docker json-file logs have no max-size on this host (daemon-wide
+# log-opts would need a dockerd restart). sf-ci grew to 1.4 GB of repeated stack traces and
+# cadvisor to 665 MB, helping /data hit 100%. Truncate any container log over 500 MB in place
+# (the container keeps running and keeps logging); name it so the noisy source is visible.
+for f in /data/docker/containers/*/*-json.log; do
+  [ -f "$f" ] || continue
+  sz=$(stat -c %s "$f" 2>/dev/null || echo 0)
+  if [ "$sz" -gt 524288000 ]; then
+    cid=$(basename "$(dirname "$f")")
+    name=$(docker ps -a --no-trunc --filter "id=$cid" --format '{{.Names}}' 2>/dev/null)
+    truncate -s 0 "$f" && echo "truncated $((sz/1048576)) MB log of ${name:-$cid}"
+  fi
+done
 
 echo "=== $(date '+%F %T') ci-disk-gc done (free=$(free_g)G) ==="
