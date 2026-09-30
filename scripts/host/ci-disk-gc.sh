@@ -98,11 +98,17 @@ for name in netout.split():
     ncont, created = insp.split("\t",1)
     if ncont != "0":                       # attached to a container → in use, skip
         continue
-    cm = re.match(r"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})", created.strip())
+    # `docker network inspect {{.Created}}` prints "2026-09-27 19:29:39.209 +0800 CST" (space, not
+    # "T", and host-local offset). The original "T"-only regex never matched, so from 2026-08-08 to
+    # 2026-09-30 this reaper skipped every network and removed none (0 "reaped" lines in the log);
+    # 24 idle CI nets up to 3 days old exhausted the pool again ("fully subnetted", esp32 PR-24).
+    cm = re.match(r"(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2})(?:\.\d+)?\s*(Z|[+-]\d{2}:?\d{2})?", created.strip())
     if not cm:
+        print(f"network reaper: cannot parse Created of {name}: {created!r}")
         continue
-    cdt = datetime.datetime.strptime(cm.group(1), "%Y-%m-%dT%H:%M:%S").replace(
-        tzinfo=datetime.timezone.utc)
+    off = cm.group(3) or "Z"
+    off = "+0000" if off == "Z" else off.replace(":", "")
+    cdt = datetime.datetime.strptime(f"{cm.group(1)} {cm.group(2)} {off}", "%Y-%m-%d %H:%M:%S %z")
     # 2026-09-14: 2h was too slow on a busy day — 20+ PR/main builds inside 2h left every
     # net younger than the cutoff and the pool exhausted again (python/node main failed with
     # "fully subnetted"). 1h is still far past any build step gap; an in-use net has containers.
