@@ -1,0 +1,4 @@
+SHELL=/bin/bash
+PATH=/usr/local/bin:/usr/bin:/bin
+# first Sunday of the month, 04:00 (Asia/Taipei) — quietest hour; renovate runs 19:00
+0 4 1-7 * * root [ "$(date +\%u)" = 7 ] && /usr/local/bin/jenkins-auto-upgrade.sh >/dev/null 2>&1
