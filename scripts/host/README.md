@@ -44,7 +44,8 @@ moves when someone rebuilds it — it once sat 4 months behind with open securit
 
 check (core vs base image, pending plugins; nothing new -> exit) -> backup home (minus workspace) to
 `/data/backup/jenkins-home-pre-upgrade.tgz` + tag running image `devops-jenkins:rollback` -> build
-`devops-jenkins:candidate` -> quietDown, wait for idle (max 90 min, else skip) -> deploy + all plugin
+`devops-jenkins:candidate` -> wait for idle, then quietDown (max 90 min, else skip; quietDown first would
+pause running pipelines and never become idle) -> deploy + all plugin
 updates + safeRestart -> verify: no failed/inactive plugins, no security warnings, agents back,
 `vue-app-pipeline-mb/main` green. Any failure restores image + home and restarts.
 

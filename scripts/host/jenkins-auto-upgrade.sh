@@ -12,7 +12,7 @@
 #   1. check      current core vs the base image's core, and pending plugin updates; nothing -> exit
 #   2. backup     JENKINS_HOME minus workspace -> $BACKUP, running image tagged devops-jenkins:rollback
 #   3. build      new image as devops-jenkins:candidate (latest is untouched until deploy)
-#   4. idle       quietDown, wait for 0 busy executors (gives up after IDLE_MAX_MIN, changes nothing)
+#   4. idle       wait for 0 busy executors, then quietDown (gives up after IDLE_MAX_MIN, changes nothing)
 #   5. deploy     candidate -> latest, recreate the container, stage every plugin update, safeRestart
 #   6. verify     0 failed/inactive plugins, 0 security warnings, agents that were online are back,
 #                 SMOKE_JOB builds SUCCESS
@@ -104,18 +104,26 @@ if ! docker build -q --pull -t devops-jenkins:candidate "$COMPOSE_DIR/jenkins" >
 fi
 
 # ---------- 4. idle ----------
-jpost /quietDown >/dev/null
+# Wait for idle FIRST, quietDown only once idle. quietDown pauses running Pipeline builds
+# ("Pausing (Preparing for shutdown)"), so "quietDown, then wait for 0 busy" never ends — the 2026-10-01
+# install test sat 90 min with two builds frozen at their last step and all CI queued behind it.
+busy(){ jget '/computer/api/json?tree=busyExecutors' | tr -dc 0-9; }
 IDLE=""
 for i in $(seq 1 $((IDLE_MAX_MIN * 2))); do
-  [ "$(jget '/computer/api/json?tree=busyExecutors' | tr -dc 0-9)" = 0 ] && { IDLE=1; break; }
+  if [ "$(busy)" = 0 ]; then
+    jpost /quietDown >/dev/null
+    sleep 5
+    [ "$(busy)" = 0 ] && { IDLE=1; break; }
+    jpost /cancelQuietDown >/dev/null     # a build started in the gap: let it run, keep waiting
+  fi
   sleep 30
 done
 if [ -z "$IDLE" ]; then
-  jpost /cancelQuietDown >/dev/null
   docker rmi devops-jenkins:candidate >/dev/null 2>&1
   log "never idle in ${IDLE_MAX_MIN} min, skipped (next run retries)"
   exit 0
 fi
+log "idle, quietDown set"
 
 # ---------- 5-7. deploy, verify, rollback ----------
 rollback(){
