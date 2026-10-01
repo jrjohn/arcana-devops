@@ -1,4 +1,6 @@
-FROM jenkins/jenkins:lts
+# lts-jdk25: Jenkins ends Java 21 support on 2027-09-30. Pin the JDK so the floating lts tag cannot
+# switch it underneath us (2026-10-01).
+FROM jenkins/jenkins:lts-jdk25
 
 COPY plugins.txt /usr/share/jenkins/ref/plugins.txt
 RUN jenkins-plugin-cli --plugin-file /usr/share/jenkins/ref/plugins.txt
