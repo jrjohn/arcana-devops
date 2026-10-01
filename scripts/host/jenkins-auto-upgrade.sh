@@ -36,7 +36,7 @@ J=http://localhost:8080/jenkins
 JC="$(sudo cat /etc/ci-jenkins-cred 2>/dev/null)"
 CJ=$(mktemp); trap 'rm -f "$CJ"' EXIT
 
-log(){ echo "$(date '+%F %T') $*" | tee -a "$LOG"; }
+log(){ local l; l="$(date '+%F %T') $*"; echo "$l" >> "$LOG"; echo "$l" 2>/dev/null || true; }
 gh_(){ docker exec agent-task-node gh "$@"; }
 jget(){ curl -sfg -m 30 -u "$JC" "$J$1"; }
 crumb(){ curl -s -m 30 -c "$CJ" -b "$CJ" -u "$JC" "$J/crumbIssuer/api/json" | python3 -c "import sys,json;print(json.load(sys.stdin)['crumb'])" 2>/dev/null; }
@@ -62,6 +62,13 @@ report(){    # $1=title $2=body $3=close|open
   [ "$3" = close ] && [ -n "$n" ] && gh_ issue close "$n" -R "$REPO" >/dev/null 2>&1
   log "reported: $1 (issue #${n:-?}, $3)"
 }
+
+# One run at a time (cron + a manual run must never deploy/roll back concurrently), and never die
+# half-way because the terminal that started it went away: ignore SIGPIPE so a closed stdout only
+# fails the echo, not the run (2026-10-01: an ssh-launched test lost its terminal mid-wait).
+trap '' PIPE
+exec 9>/var/lock/jenkins-auto-upgrade.lock
+flock -n 9 || { log "another run is in progress, exiting"; exit 0; }
 
 [ -n "$JC" ] || { log "no Jenkins credential"; exit 0; }
 [ -n "$(core_version)" ] || { log "Jenkins not answering, skipping"; exit 0; }
