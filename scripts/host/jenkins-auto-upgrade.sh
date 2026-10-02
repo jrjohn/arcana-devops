@@ -192,6 +192,7 @@ done
 [ "$R" = SUCCESS ] || rollback "smoke build $SMOKE_JOB #$N result: ${R:-timeout}"
 
 FINAL=$(core_version)
+docker rmi devops-jenkins:candidate >/dev/null 2>&1   # same image as latest now; drop the extra tag
 log "SUCCESS: core $CUR -> $FINAL, $PLUG plugins, smoke $SMOKE_JOB #$N green"
 report "upgraded $CUR -> $FINAL" "Monthly upgrade done and verified.
 
