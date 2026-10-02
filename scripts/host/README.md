@@ -9,12 +9,13 @@ when /data is 100% full or docker itself is wedged). Synced from the live host
 | `ci-watchdog.sh` | `/usr/local/bin/` | cron */15 | self-heal + SendGrid alert (Jenkins offline, agent dead, disk pressure, SonarQube ES read-only) |
 | `ci-disk-gc.sh` | `/usr/local/bin/` | cron */20 | age-based (>6h) `*:build-N` image GC + stale `arcana-ci-*` test-container reaper + idle CI network reaper |
 | `ci-remediate.sh` | `/usr/local/bin/` | on demand (watchdog) | remediation actions: prune-disk, online-builtin, restart-sonarqube, … |
+| `jenkins-auto-upgrade.sh` | `/usr/local/bin/` | cron 1st Sunday 04:00 | Jenkins core + plugin upgrade, verified by a real build, automatic rollback (see below) |
 | `cron.d/*` | `/etc/cron.d/` | — | cron definitions for the above |
 
 Install/update:
 
 ```bash
-sudo cp scripts/host/ci-*.sh /usr/local/bin/ && sudo chmod +x /usr/local/bin/ci-*.sh
+sudo cp scripts/host/ci-*.sh scripts/host/jenkins-auto-upgrade.sh /usr/local/bin/ && sudo chmod +x /usr/local/bin/ci-*.sh /usr/local/bin/jenkins-auto-upgrade.sh
 sudo cp scripts/host/cron.d/* /etc/cron.d/
 ```
 
@@ -34,6 +35,23 @@ sudo cp scripts/host/cron.d/* /etc/cron.d/
 
 These buy time; they do not add capacity. Sustained build-storm peaks reaching
 ~96 % mean /data needs to grow.
+
+## Monthly Jenkins upgrade (2026-10-01)
+
+The controller image is built from `jenkins/Dockerfile` (`FROM jenkins/jenkins:lts-jdk25`) and only
+moves when someone rebuilds it — it once sat 4 months behind with open security advisories.
+`jenkins-auto-upgrade.sh` runs on the first Sunday of each month:
+
+check (core vs base image, pending plugins; nothing new -> exit) -> backup home (minus workspace) to
+`/data/backup/jenkins-home-pre-upgrade.tgz` + tag running image `devops-jenkins:rollback` -> build
+`devops-jenkins:candidate` -> wait for idle, then quietDown (max 90 min, else skip; quietDown first would
+pause running pipelines and never become idle) -> deploy + all plugin
+updates + safeRestart -> verify: no failed/inactive plugins, no security warnings, agents back,
+`vue-app-pipeline-mb/main` green. Any failure restores image + home and restarts.
+
+Result: one `[jenkins-upgrade]` issue per run (closed on success, open on rollback/failure).
+Log: `/var/log/jenkins-auto-upgrade.log`. Test: `UPGRADE_DRY=1` (report only), `FORCE=1` (run even if
+up to date), `FORCE=1 FORCE_FAIL=1` (exercise rollback). Replaces the retired `plugin-update-bot.sh`.
 
 ## Jenkins job seeding (resurrection trap)
 

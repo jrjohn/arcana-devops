@@ -1,4 +1,7 @@
 #!/bin/bash
+# RETIRED 2026-10-01 — replaced by jenkins-auto-upgrade.sh (core + plugins, verified, auto-rollback).
+# Its "open a PR, apply by hand later" flow stalled on the first PR (#8, never merged, 4 months behind).
+#
 # plugin-update-bot.sh — Renovate-style weekly PR for Jenkins plugin updates.
 #
 # Reads the live Jenkins update-center diff (installed vs available) and opens
