@@ -33,7 +33,7 @@
           <repoOwner>jrjohn</repoOwner>
           <repository>arcana-windows</repository>
           <repositoryUrl>https://github.com/jrjohn/arcana-windows.git</repositoryUrl>
-          <traits>
+          <traits><jenkins.scm.impl.trait.WildcardSCMHeadFilterTrait plugin="scm-api"><includes>*</includes><excludes>renovate/*</excludes></jenkins.scm.impl.trait.WildcardSCMHeadFilterTrait>
             <org.jenkinsci.plugins.github__branch__source.BranchDiscoveryTrait>
               <strategyId>1</strategyId>
             </org.jenkinsci.plugins.github__branch__source.BranchDiscoveryTrait>
