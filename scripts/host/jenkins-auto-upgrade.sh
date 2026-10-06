@@ -76,7 +76,14 @@ flock -n 9 || { log "another run is in progress, exiting"; exit 0; }
 # ---------- 1. check ----------
 CUR=$(core_version)
 BASE=$(sed -n 's/^FROM //p' "$COMPOSE_DIR/jenkins/Dockerfile" | head -1)
-docker pull -q "$BASE" >/dev/null 2>&1 || { log "cannot pull $BASE, skipping"; exit 0; }
+# Retry: the 2026-10-04 04:00 run failed here because ci-disk-gc (every 20 min, so also at 04:00)
+# pruned while the pull was in flight. Cron now runs at 04:07; the retries cover the rest.
+pulled=""
+for try in 1 2 3; do
+  docker pull -q "$BASE" >/dev/null 2>&1 && { pulled=1; break; }
+  log "pull of $BASE failed (try $try/3)"; sleep 30
+done
+[ -n "$pulled" ] || { log "cannot pull $BASE, skipping"; exit 0; }
 NEW=$(docker run --rm --entrypoint java "$BASE" -jar /usr/share/jenkins/jenkins.war --version 2>/dev/null | tail -1)
 PLUG=$(groovy 'Jenkins.instance.updateCenter.sites.each{it.updateDirectlyNow(false)}; println Jenkins.instance.updateCenter.updates.size()' 300 | tr -dc 0-9)
 log "check: core $CUR, $BASE has ${NEW:-?}, plugin updates ${PLUG:-?}"
