@@ -32,8 +32,14 @@ println "SU_BEGIN"; println run('softwareupdate --list 2>&1 | grep -E "^[*] Labe
 EOF
 )
 C=$(mktemp); trap 'rm -f "$C"' EXIT
-CR=$(curl -s -c "$C" -b "$C" -u "$JC" "$J/crumbIssuer/api/json" | python3 -c "import sys,json;print(json.load(sys.stdin)['crumb'])" 2>/dev/null)
-OUT=$(curl -s -m 300 -c "$C" -b "$C" -u "$JC" -H "Jenkins-Crumb: $CR" --data-urlencode "script=$GROOVY" "$J/computer/macmini/scriptText")
+# Retry: on 2026-10-05 the single attempt hit a moment when the macmini agent was not connected
+# (the node was online again minutes later) and the week's check was lost.
+for try in 1 2 3; do
+  CR=$(curl -s -c "$C" -b "$C" -u "$JC" "$J/crumbIssuer/api/json" | python3 -c "import sys,json;print(json.load(sys.stdin)['crumb'])" 2>/dev/null)
+  OUT=$(curl -s -m 300 -c "$C" -b "$C" -u "$JC" -H "Jenkins-Crumb: $CR" --data-urlencode "script=$GROOVY" "$J/computer/macmini/scriptText")
+  echo "$OUT" | grep -q "^XCODE=" && break
+  [ "$try" -lt 3 ] && sleep 60
+done
 if ! echo "$OUT" | grep -q "^XCODE="; then
   log "macmini unreachable or script failed: $(echo "$OUT" | head -2 | tr '\n' ' ' | cut -c1-200)"
   exit 0
