@@ -35,8 +35,10 @@ pipeline {
     environment {
         // docker -v resolves bind sources on the HOST. $WORKSPACE is a path in
         // the jenkins container; its host-side location is under the
-        // jenkins_home bind (/data/docker/volumes/devops_jenkins_home/_data).
-        HOST_WS = "/data/docker/volumes/devops_jenkins_home/_data/workspace/${env.JOB_NAME}"
+        // jenkins_home bind, /opt/arcana-state/jenkins-home since the 2026-06 move off the
+        // docker volume. The old path no longer has the workspace, so every run since 06-08
+        // failed with "can't open file '/repo/scripts/deploy/plan.py'" (fixed 2026-10-13).
+        HOST_WS = "/opt/arcana-state/jenkins-home/workspace/${env.JOB_NAME}"
     }
     stages {
         stage('Plan') {
