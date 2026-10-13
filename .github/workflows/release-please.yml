@@ -1,0 +1,52 @@
+name: release-please
+
+# Cut releases automatically on every push to main. release-please reads
+# release-please-config.json + .release-please-manifest.json (repo root), scans
+# the conventional commits since the last release, and opens/updates a release
+# PR bumping the version + CHANGELOG. Merging that PR tags the release.
+#
+# Why this exists: the Jenkins pipeline only builds/tests/scans — it never
+# releases. release-please was bootstrapped but had no trigger, so it only ran
+# when invoked by hand; commits pushed straight to main never produced a new
+# version. This workflow makes any push to main trigger release-please, so
+# releases keep flowing without manual steps.
+#
+# NOTE: requires "Allow GitHub Actions to create and approve pull requests"
+# (repo Settings > Actions > General > Workflow permissions) to be enabled,
+# otherwise release-please cannot open its release PR.
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - id: rp
+        uses: googleapis/release-please-action@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      # This repo has no Jenkins job, so the merge-flow that merges release PRs for the rest of
+      # the fleet never sees it: merge the release PR here, then run release-please once more to
+      # tag + publish. The second run is required — a merge made with GITHUB_TOKEN does not
+      # trigger another workflow run, so nothing else would ever cut the release.
+      # Verified 2026-10-02 in a throwaway repo: fix: push -> release PR -> merged -> tag + release
+      # in one run; chore: push -> no PR, no release, no extra run.
+      - name: Merge the release PR
+        if: ${{ steps.rp.outputs.pr }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr merge "${{ fromJSON(steps.rp.outputs.pr).number }}" --squash --delete-branch -R "${{ github.repository }}"
+          sleep 5
+      - name: Tag and publish the release
+        if: ${{ steps.rp.outputs.pr }}
+        uses: googleapis/release-please-action@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
