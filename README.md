@@ -337,7 +337,7 @@ Each pipeline is evaluated on 6 dimensions: **Speed**, **Log Cleanliness**, **Co
 
 ## Pipelines
 
-All 14 pipelines are **multibranch** (`WorkflowMultiBranchProject`) — each auto-discovers `main` + open PR branches from its GitHub repo and runs the repo's `Jenkinsfile`:
+All 15 pipelines are **multibranch** (`WorkflowMultiBranchProject`) — each auto-discovers `main` + open PR branches from its GitHub repo and runs the repo's `Jenkinsfile`:
 
 | # | Pipeline (job) | Type | Platform | SonarQube |
 |---|----------|------|----------|-----------|
@@ -355,6 +355,7 @@ All 14 pipelines are **multibranch** (`WorkflowMultiBranchProject`) — each aut
 | 12 | harmonyos-app-pipeline-mb | Docker compose build + run (amd64) | Mobile | JavaScript |
 | 13 | ios-app-mb | Swift build + test (Mac agent) | Mobile | Swift (sonar-apple) |
 | 14 | windows-app-pipeline-mb | .NET build + test (Windows agent, native) | Desktop / .NET | Skip (remote) |
+| 15 | desktop-rust-app-pipeline-mb | Docker build + check (fmt/layers/clippy/llvm-cov) | Desktop / Rust (egui) | Rust |
 
 > **Note:** iOS and Windows pipelines require dedicated agents (Mac Mini / Windows .106 machine). See [Adding SSH Agents](#adding-ssh-agents) below. ESP32 C/C++ analysis requires SonarQube Developer Edition. STM32 uses sonar-cxx, iOS uses sonar-apple, HarmonyOS ArkTS is recognized as JavaScript. The former cross-platform `.NET` pipeline (`dotnet-app-pipeline-mb`, Jenkinsfile.dotnet) was retired 2026-05-29 — arcana-windows is built natively by `windows-app-pipeline-mb` (Jenkinsfile.windows) only.
 
