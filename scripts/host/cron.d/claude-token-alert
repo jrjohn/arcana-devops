@@ -1,0 +1,3 @@
+# Mail John when the bluesea Claude CLI outputs > 100K tokens in 30 min (1 mail / hour max).
+# scripts/host/claude-token-alert.py. 2026-10-19.
+*/5 * * * * root /usr/local/bin/claude-token-alert.py >> /var/log/claude-token-alert.log 2>&1
