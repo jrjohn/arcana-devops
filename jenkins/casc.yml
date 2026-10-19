@@ -36,7 +36,9 @@ jenkins:
     - permanent:
         name: "windows"
         remoteFS: "${WINDOWS_REMOTE_FS:-C:\\jenkins-agent}"
-        numExecutors: 2
+        # 1, not 2: two concurrent Rust builds on this 4-core / 7.7 GB laptop share ~/.rustup and
+        # ~/.cargo and corrupted each other's artifacts (desktop-rust PR-17/18/19, 2026-10-19).
+        numExecutors: 1
         mode: EXCLUSIVE
         labelString: "windows"
         retentionStrategy: "always"
