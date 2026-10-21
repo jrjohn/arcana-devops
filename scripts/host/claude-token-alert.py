@@ -38,6 +38,12 @@ THRESHOLD = int(os.environ.get("THRESHOLD", "100000"))
 COOLDOWN_MIN = int(os.environ.get("COOLDOWN_MIN", "60"))
 STATE = os.environ.get("STATE", "/var/lib/claude-token-alert/last-sent")
 TW = dt.timezone(dt.timedelta(hours=8))
+# Long-lived token from `claude setup-token` (1 year). set-claude-longlived-token.sh writes the
+# issue date (YYYY-MM-DD) here; mail once a day when fewer than EXPIRY_WARN_DAYS remain.
+TOKEN_ISSUED = os.environ.get("TOKEN_ISSUED", CLAUDE_HOME + "/.oauth-token-issued")
+TOKEN_LIFETIME_DAYS = int(os.environ.get("TOKEN_LIFETIME_DAYS", "365"))
+EXPIRY_WARN_DAYS = int(os.environ.get("EXPIRY_WARN_DAYS", "14"))
+EXPIRY_STATE = os.environ.get("EXPIRY_STATE", "/var/lib/claude-token-alert/expiry-last-sent")
 
 
 def first_prompt(path):
@@ -130,8 +136,41 @@ def mark_sent(now):
         fh.write(now.isoformat())
 
 
+def check_expiry(now, dry):
+    """Warn before the 1-year agent token dies (the 2026-10-21 outage: /login refresh tokens
+    expire after 30 days and every AI step on bluesea stopped with no mail)."""
+    try:
+        with open(TOKEN_ISSUED) as fh:
+            issued = dt.date.fromisoformat(fh.read().strip())
+    except (OSError, ValueError):
+        return
+    left = (issued + dt.timedelta(days=TOKEN_LIFETIME_DAYS) - now.astimezone(TW).date()).days
+    if left > EXPIRY_WARN_DAYS:
+        return
+    today = now.astimezone(TW).date().isoformat()
+    try:
+        with open(EXPIRY_STATE) as fh:
+            if fh.read().strip() == today:
+                return
+    except OSError:
+        pass
+    text = ("bluesea 的 Claude 長效 token(claude setup-token)%s。\n發行日 %s,有效 %d 天。\n"
+            "換新:在 Mac 跑 bash ~/set-claude-longlived-token.sh(要開瀏覽器同意一次)。"
+            % ("已過期" if left < 0 else "還剩 %d 天到期" % left, issued, TOKEN_LIFETIME_DAYS))
+    subject = "[arcana-ci] Claude token %s" % ("已過期" if left < 0 else "%d 天後到期" % left)
+    print("  token expiry:", subject)
+    if dry:
+        return
+    send(subject, text)
+    os.makedirs(os.path.dirname(EXPIRY_STATE), exist_ok=True)
+    with open(EXPIRY_STATE, "w") as fh:
+        fh.write(today)
+
+
 def main(argv):
     now = dt.datetime.now(dt.timezone.utc)
+    if "--test" not in argv:
+        check_expiry(now, "--dry-run" in argv)
     if "--test" in argv:
         send("[arcana-ci] 測試:Claude token 告警", "這是測試信,告警腳本能寄信。")
         print("test mail sent to", TO)
