@@ -1,0 +1,3 @@
+# Copy GitHub traffic (14-day API window) into gh-traffic-db for the Grafana dashboard.
+# docker-compose.gh-traffic.yml + tools/gh-traffic. 2026-11-04.
+17 */6 * * * root cd /data/devops && docker compose -p gh-traffic -f docker-compose.gh-traffic.yml run --rm gh-traffic-collector >> /var/log/gh-traffic.log 2>&1

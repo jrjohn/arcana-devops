@@ -1,0 +1,45 @@
+# GitHub traffic history for the Grafana "GitHub Traffic" dashboard.
+# GitHub's traffic API only keeps 14 days, so tools/gh-traffic copies every day it sees into
+# this Postgres. Secrets come from /data/devops/.env:
+#   GH_TRAFFIC_DB_PASSWORD   writer (collector)
+#   GH_TRAFFIC_RO_PASSWORD   read-only user Grafana connects as
+#   GH_TRAFFIC_TOKEN         fine-grained PAT, all jrjohn repos, Administration: read-only
+#
+#   docker compose -p gh-traffic -f docker-compose.gh-traffic.yml up -d gh-traffic-db
+#   docker compose -p gh-traffic -f docker-compose.gh-traffic.yml run --rm gh-traffic-collector   # cron, every 6 h
+services:
+  gh-traffic-db:
+    image: postgres:18-alpine
+    container_name: gh-traffic-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: gh_traffic
+      POSTGRES_USER: gh_traffic
+      POSTGRES_PASSWORD: "${GH_TRAFFIC_DB_PASSWORD:?set in .env}"
+      GH_TRAFFIC_RO_PASSWORD: "${GH_TRAFFIC_RO_PASSWORD:?set in .env}"
+    volumes:
+      - /data/gh-traffic/pg:/var/lib/postgresql
+      - ./monitoring/gh-traffic/init-readonly.sh:/docker-entrypoint-initdb.d/10-readonly.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gh_traffic -d gh_traffic"]
+      interval: 30s
+      retries: 5
+
+  gh-traffic-collector:
+    build: ./tools/gh-traffic
+    image: gh-traffic:latest
+    profiles: ["job"]
+    environment:
+      DATABASE_URL: "postgres://gh_traffic:${GH_TRAFFIC_DB_PASSWORD}@gh-traffic-db:5432/gh_traffic"
+      GH_TRAFFIC_TOKEN: "${GH_TRAFFIC_TOKEN:-}"
+      GH_OWNER: jrjohn
+    volumes:
+      - /data/gh-traffic/import:/import:ro
+    depends_on:
+      gh-traffic-db:
+        condition: service_healthy
+
+networks:
+  default:
+    name: devops_default
+    external: true
