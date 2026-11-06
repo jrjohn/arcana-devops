@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/jrjohn/arcana-devops/compare/v1.0.0...v1.1.0) (2026-11-06)
+
+
+### Features
+
+* **monitoring:** GitHub 流量長期儀表板 ([#60](https://github.com/jrjohn/arcana-devops/issues/60)) ([52a05ad](https://github.com/jrjohn/arcana-devops/commit/52a05ad5e80f962e72a6d1a39ac8cfd36378cf3f))
+
 ## 1.0.0 (2026-10-13)
 
 
