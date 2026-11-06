@@ -12,9 +12,9 @@ def target(sql, fmt="time_series", ref="A"):
     return {"datasource": DS, "editorMode": "code", "format": fmt, "rawQuery": True, "rawSql": sql, "refId": ref}
 
 
-def stat(title, sql, x, w=4, unit="none", desc=""):
+def stat(title, sql, x, w=4, unit="none", desc="", y=0):
     return {"type": "stat", "title": title, "description": desc, "datasource": DS,
-            "gridPos": {"h": 4, "w": w, "x": x, "y": 0},
+            "gridPos": {"h": 4 if y == 0 else 6, "w": w, "x": x, "y": y},
             "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": False},
                         "colorMode": "value", "graphMode": "none", "textMode": "value"},
             "fieldConfig": {"defaults": {"unit": unit, "color": {"mode": "fixed", "fixedColor": "#0891b2"}}, "overrides": []},
@@ -60,6 +60,10 @@ FROM repo_daily WHERE $__timeFilter(day) AND {REPO_FILTER} GROUP BY repo HAVING 
     table("外部來源(最近一次快照的 14 天)", """SELECT referrer AS "來源", SUM(uniques) AS "訪客", SUM(count) AS "瀏覽", string_agg(DISTINCT repo, ', ') AS "Repo"
 FROM referrer_snapshot WHERE snap_day = (SELECT MAX(snap_day) FROM referrer_snapshot) GROUP BY referrer ORDER BY 2 DESC""", 20, 12, 12,
           desc="GitHub 只給 14 天累計,所以這裡是最新快照;github.com 是站內流量"),
+    stat("README 破圖", "SELECT broken FROM badge_run ORDER BY check_day DESC LIMIT 1", 0, w=4, y=38,
+         desc="每天 08:40 用 GitHub 實際顯示的頁面、不登入抓每張圖;連續 3 次(間隔 2 分鐘)失敗才算"),
+    table("破圖清單(最近一次檢查)", """SELECT repo AS "Repo", alt AS "圖", status AS "原因", original AS "網址"
+FROM badge_check WHERE check_day = (SELECT MAX(check_day) FROM badge_run) ORDER BY repo""", 38, 4, 20, h=6),
     ts("星星與追蹤者成長", """SELECT s.snap_day::timestamp AS time, SUM(s.stars) AS "星星", MAX(a.followers) AS "追蹤者"
 FROM repo_snapshot s LEFT JOIN account_snapshot a USING (snap_day) WHERE $__timeFilter(s.snap_day) GROUP BY 1 ORDER BY 1""", 30, draw="line"),
 ]

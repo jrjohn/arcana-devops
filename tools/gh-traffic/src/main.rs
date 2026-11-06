@@ -7,8 +7,12 @@
 //! ```text
 //! gh-traffic collect          # fetch all repos of GH_OWNER now (cron, every 6 h)
 //! gh-traffic import <dir>     # load a saved snapshot dir (snap-YYYYMMDD/<repo>.{views,clones,ref}.json)
+//! gh-traffic badges           # README images visitors see as broken (cron, daily; mails John)
 //! ```
-//! Env: `DATABASE_URL`, `GH_TRAFFIC_TOKEN` (collect only; needs Administration: read), `GH_OWNER`.
+//! Env: `DATABASE_URL`, `GH_TRAFFIC_TOKEN` (needs Administration: read), `GH_OWNER`,
+//! `GMAIL_CRED` (badges: file with `user` and app password on two lines), `ALERT_TO`.
+
+mod badges;
 
 use std::error::Error;
 use std::path::Path;
@@ -127,6 +131,20 @@ impl Github {
             .call()
             .map_err(|e| format!("GET {url}: {e}"))?;
         Ok(resp.body_mut().read_json::<Value>()?)
+    }
+
+    /// An API resource in another media type, such as a README rendered to HTML.
+    fn get_text(&self, path: &str, accept: &str) -> Res<String> {
+        let url = format!("https://api.github.com/{path}");
+        let mut resp = self
+            .agent
+            .get(&url)
+            .header("Authorization", &self.auth)
+            .header("Accept", accept)
+            .header("User-Agent", "arcana-gh-traffic")
+            .call()
+            .map_err(|e| format!("GET {url}: {e}"))?;
+        Ok(resp.body_mut().read_to_string()?)
     }
 
     /// Every repo the token's user owns, private ones included, forks excluded.
@@ -250,6 +268,41 @@ fn main() -> Res<()> {
                     .ok_or("usage: gh-traffic import <snap-YYYYMMDD dir>")?,
             ),
         ),
-        Some(other) => Err(format!("unknown command {other}; use collect | import <dir>").into()),
+        Some("badges") => {
+            let token =
+                std::env::var("GH_TRAFFIC_TOKEN").map_err(|_| "GH_TRAFFIC_TOKEN is not set")?;
+            let owner = std::env::var("GH_OWNER").unwrap_or_else(|_| "jrjohn".into());
+            badges::run(&mut db, &Github::new(&token), &owner, send_mail)
+        }
+        Some(other) => {
+            Err(format!("unknown command {other}; use collect | import <dir> | badges").into())
+        }
     }
+}
+
+/// Mail John through Gmail, with the credentials daily-ci-agent already uses.
+fn send_mail(subject: &str, body: &str) -> Res<()> {
+    use lettre::message::header::ContentType;
+    use lettre::transport::smtp::authentication::Credentials;
+    use lettre::{Message, SmtpTransport, Transport};
+
+    let cred_path = std::env::var("GMAIL_CRED").map_err(|_| "GMAIL_CRED is not set")?;
+    let cred = std::fs::read_to_string(&cred_path).map_err(|e| format!("{cred_path}: {e}"))?;
+    let mut parts = cred.split_whitespace();
+    let (Some(user), Some(password)) = (parts.next(), parts.next()) else {
+        return Err(format!("{cred_path}: expected user and password").into());
+    };
+    let to = std::env::var("ALERT_TO").unwrap_or_else(|_| "jr.johnchang@gmail.com".into());
+    let msg = Message::builder()
+        .from(format!("Arcana CI <{user}>").parse()?)
+        .to(to.parse()?)
+        .subject(subject)
+        .header(ContentType::TEXT_PLAIN)
+        .body(body.to_string())?;
+    SmtpTransport::relay("smtp.gmail.com")?
+        .credentials(Credentials::new(user.to_string(), password.to_string()))
+        .build()
+        .send(&msg)?;
+    println!("  mailed {to}");
+    Ok(())
 }

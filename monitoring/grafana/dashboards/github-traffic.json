@@ -588,6 +588,94 @@
       "id": 11
     },
     {
+      "type": "stat",
+      "title": "README 破圖",
+      "description": "每天 08:40 用 GitHub 實際顯示的頁面、不登入抓每張圖;連續 3 次(間隔 2 分鐘)失敗才算",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "gh-traffic"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 4,
+        "x": 0,
+        "y": 38
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#0891b2"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "gh-traffic"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT broken FROM badge_run ORDER BY check_day DESC LIMIT 1",
+          "refId": "A"
+        }
+      ],
+      "id": 12
+    },
+    {
+      "type": "table",
+      "title": "破圖清單(最近一次檢查)",
+      "description": "",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "gh-traffic"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 20,
+        "x": 4,
+        "y": 38
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "gh-traffic"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT repo AS \"Repo\", alt AS \"圖\", status AS \"原因\", original AS \"網址\"\nFROM badge_check WHERE check_day = (SELECT MAX(check_day) FROM badge_run) ORDER BY repo",
+          "refId": "A"
+        }
+      ],
+      "id": 13
+    },
+    {
       "type": "timeseries",
       "title": "星星與追蹤者成長",
       "description": "",
@@ -640,7 +728,7 @@
           "refId": "A"
         }
       ],
-      "id": 12
+      "id": 14
     }
   ]
 }
