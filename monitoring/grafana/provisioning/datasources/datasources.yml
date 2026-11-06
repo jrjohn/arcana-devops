@@ -13,3 +13,19 @@ datasources:
     uid: loki
     access: proxy
     url: http://loki:3100
+
+  # GitHub traffic history (docker-compose.gh-traffic.yml). Read-only login; password from
+  # GH_TRAFFIC_RO_PASSWORD, which docker-compose.monitoring.yml passes into the grafana container.
+  - name: GitHub Traffic
+    type: grafana-postgresql-datasource
+    uid: gh-traffic
+    access: proxy
+    url: gh-traffic-db:5432
+    user: grafana_ro
+    jsonData:
+      database: gh_traffic
+      sslmode: disable
+      postgresVersion: 1800
+      timescaledb: false
+    secureJsonData:
+      password: ${GH_TRAFFIC_RO_PASSWORD}
