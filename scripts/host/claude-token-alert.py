@@ -19,6 +19,7 @@ Usage:
   claude-token-alert.py            # cron: check and mail if over threshold
   claude-token-alert.py --dry-run  # print what it would do, never mail
   claude-token-alert.py --test     # send one test mail now (verifies delivery)
+  claude-token-alert.py --at 2026-11-08T09:10+08:00 --dry-run   # replay a past window
 """
 import datetime as dt
 import glob
@@ -35,6 +36,12 @@ GMAIL_CRED = os.environ.get("GMAIL_CRED", CLAUDE_HOME + "/.gmail-smtp")  # "user
 TO = os.environ.get("ALERT_TO", "jr.johnchang@gmail.com")
 WINDOW_MIN = int(os.environ.get("WINDOW_MIN", "30"))
 THRESHOLD = int(os.environ.get("THRESHOLD", "100000"))
+# The once-a-day daily-ci-agent run (with the forks it spawns) normally outputs 100-135K in its
+# busiest half hour, which tripped the 100K alarm almost every morning (10-20 .. 11-08). A real
+# runaway is in ci-flow / merge-flow, whose 10-19 loop was only 115K per 30 min, so the general
+# threshold cannot be raised. The daily run is counted on its own with a higher threshold.
+DAILY_THRESHOLD = int(os.environ.get("DAILY_THRESHOLD", "300000"))
+DAILY_MARK = "daily CI auto-remediation agent"
 COOLDOWN_MIN = int(os.environ.get("COOLDOWN_MIN", "60"))
 STATE = os.environ.get("STATE", "/var/lib/claude-token-alert/last-sent")
 TW = dt.timezone(dt.timedelta(hours=8))
@@ -64,6 +71,19 @@ def first_prompt(path):
     return "?"
 
 
+def owner(path):
+    """The session a transcript belongs to: a subagent/fork file counts as its parent's."""
+    if "/subagents/" in path:
+        return os.path.dirname(os.path.dirname(path)) + ".jsonl"
+    return path
+
+
+def is_daily(session, cache={}):
+    if session not in cache:
+        cache[session] = DAILY_MARK in first_prompt(session)
+    return cache[session]
+
+
 def scan(now):
     since = now - dt.timedelta(minutes=WINDOW_MIN)
     total, calls, per_session = 0, 0, Counter()
@@ -83,19 +103,28 @@ def scan(now):
                 if not usage or not ts:
                     continue
                 t = dt.datetime.fromisoformat(ts.replace("Z", "+00:00"))
-                if t < since:
+                if t < since or t > now:
                     continue
                 o = usage.get("output_tokens", 0)
                 total += o
                 calls += 1
-                per_session[f] += o
+                per_session[owner(f)] += o
     return total, calls, per_session
 
 
+def split(per_session):
+    """(daily-ci-agent output, everything else) in the window."""
+    daily = sum(o for s, o in per_session.items() if is_daily(s))
+    return daily, sum(per_session.values()) - daily
+
+
 def body(now, total, calls, per_session):
+    daily, other = split(per_session)
     lines = [
-        "bluesea 上的 Claude CLI 最近 %d 分鐘輸出了 %s tokens(門檻 %s),%d 次呼叫。"
-        % (WINDOW_MIN, format(total, ","), format(THRESHOLD, ","), calls),
+        "bluesea 上的 Claude CLI 最近 %d 分鐘輸出了 %s tokens,%d 次呼叫。"
+        % (WINDOW_MIN, format(total, ","), calls),
+        "  每日巡檢 %s(門檻 %s)" % (format(daily, ","), format(DAILY_THRESHOLD, ",")),
+        "  其他工作(ci-flow / merge / release…)%s(門檻 %s)" % (format(other, ","), format(THRESHOLD, ",")),
         "",
         "用最多的工作:",
     ]
@@ -169,6 +198,8 @@ def check_expiry(now, dry):
 
 def main(argv):
     now = dt.datetime.now(dt.timezone.utc)
+    if "--at" in argv:  # replay a past moment, e.g. --at 2026-11-08T09:10+08:00 --dry-run
+        now = dt.datetime.fromisoformat(argv[argv.index("--at") + 1])
     if "--test" not in argv:
         check_expiry(now, "--dry-run" in argv)
     if "--test" in argv:
@@ -176,17 +207,20 @@ def main(argv):
         print("test mail sent to", TO)
         return 0
     total, calls, per_session = scan(now)
+    daily, other = split(per_session)
     stamp = now.astimezone(TW).strftime("%m-%d %H:%M")
-    print("%s output=%s calls=%d threshold=%s" % (stamp, format(total, ","), calls,
-                                                 format(THRESHOLD, ",")))
-    if total <= THRESHOLD:
+    print("%s output=%s calls=%d daily=%s/%s other=%s/%s" % (
+        stamp, format(total, ","), calls, format(daily, ","), format(DAILY_THRESHOLD, ","),
+        format(other, ","), format(THRESHOLD, ",")))
+    if daily <= DAILY_THRESHOLD and other <= THRESHOLD:
         return 0
     if cooling_down(now):
         print("  over threshold, cooling down — not mailing")
         return 0
     text = body(now, total, calls, per_session)
-    subject = "[arcana-ci] Claude %d 分鐘輸出 %s tokens(> %s)" % (
-        WINDOW_MIN, format(total, ","), format(THRESHOLD, ","))
+    who = "其他工作" if other > THRESHOLD else "每日巡檢"
+    subject = "[arcana-ci] Claude %d 分鐘輸出 %s tokens(%s超過門檻)" % (
+        WINDOW_MIN, format(total, ","), who)
     if "--dry-run" in argv:
         print("  DRY RUN would mail:\n" + text)
         return 0
