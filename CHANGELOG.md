@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/jrjohn/arcana-devops/compare/v1.2.0...v1.3.0) (2026-11-09)
+
+
+### Features
+
+* **ci-health:** 每天 10:30 自動做 CI/CD 健康檢查;巡檢指令與每週重建腳本納入版控 ([#66](https://github.com/jrjohn/arcana-devops/issues/66)) ([20709d9](https://github.com/jrjohn/arcana-devops/commit/20709d9ebb6d4dcc18dbeb07391b8fe2b682c3e0))
+
 ## [1.2.0](https://github.com/jrjohn/arcana-devops/compare/v1.1.0...v1.2.0) (2026-11-09)
 
 
