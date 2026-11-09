@@ -66,6 +66,15 @@ FROM referrer_snapshot WHERE snap_day = (SELECT MAX(snap_day) FROM referrer_snap
 FROM badge_check WHERE check_day = (SELECT MAX(check_day) FROM badge_run) ORDER BY persistent DESC, repo""", 38, 4, 20, h=6),
     ts("星星與追蹤者成長", """SELECT s.snap_day::timestamp AS time, SUM(s.stars) AS "星星", MAX(a.followers) AS "追蹤者"
 FROM repo_snapshot s LEFT JOIN account_snapshot a USING (snap_day) WHERE $__timeFilter(s.snap_day) GROUP BY 1 ORDER BY 1""", 30, draw="line"),
+    stat("CI/CD 異常", "SELECT bad FROM health_run ORDER BY check_day DESC LIMIT 1", 0, w=4, y=44,
+         desc="tools/ci-health 每天 10:30 檢查;有異常會寄信"),
+    stat("CI/CD 注意", "SELECT warn FROM health_run ORDER BY check_day DESC LIMIT 1", 4, w=4, y=44),
+    ts("main 7 天成功率(%)", """SELECT check_day::timestamp AS time, value AS "成功率"
+FROM health_item WHERE grp = 'jenkins' AND name = '全部 main(7 天)' AND $__timeFilter(check_day) ORDER BY 1""", 44, x=8, w=16, h=6, draw="line"),
+    table("CI/CD 健康檢查(最近一次)", """SELECT CASE status WHEN 'bad' THEN '🔴 異常' WHEN 'warn' THEN '🟡 注意' ELSE '🟢 正常' END AS "狀態",
+grp AS "類別", name AS "項目", detail AS "說明"
+FROM health_item WHERE check_day = (SELECT MAX(check_day) FROM health_run)
+ORDER BY CASE status WHEN 'bad' THEN 0 WHEN 'warn' THEN 1 ELSE 2 END, grp, name""", 50, 0, 24, h=14),
 ]
 
 dash = {

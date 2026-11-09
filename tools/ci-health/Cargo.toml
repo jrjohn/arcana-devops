@@ -1,0 +1,17 @@
+[package]
+name = "ci-health"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.99"
+description = "Daily CI/CD health check of the bluesea fleet: Jenkins, agents, Claude CLI, disk; stores results and mails John on failures"
+license = "MIT"
+
+[dependencies]
+lettre = { version = "0.11", default-features = false, features = ["builder", "smtp-transport", "rustls-tls"] }
+postgres = "0.19"
+serde_json = "1"
+ureq = { version = "3", features = ["json"] }
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }

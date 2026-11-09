@@ -729,6 +729,200 @@
         }
       ],
       "id": 14
+    },
+    {
+      "type": "stat",
+      "title": "CI/CD 異常",
+      "description": "tools/ci-health 每天 10:30 檢查;有異常會寄信",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "gh-traffic"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 4,
+        "x": 0,
+        "y": 44
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#0891b2"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "gh-traffic"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT bad FROM health_run ORDER BY check_day DESC LIMIT 1",
+          "refId": "A"
+        }
+      ],
+      "id": 15
+    },
+    {
+      "type": "stat",
+      "title": "CI/CD 注意",
+      "description": "",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "gh-traffic"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 4,
+        "x": 4,
+        "y": 44
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#0891b2"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "gh-traffic"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT warn FROM health_run ORDER BY check_day DESC LIMIT 1",
+          "refId": "A"
+        }
+      ],
+      "id": 16
+    },
+    {
+      "type": "timeseries",
+      "title": "main 7 天成功率(%)",
+      "description": "",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "gh-traffic"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 16,
+        "x": 8,
+        "y": 44
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 35,
+            "lineWidth": 2,
+            "barAlignment": 0,
+            "showPoints": "auto",
+            "stacking": {
+              "mode": "none"
+            }
+          },
+          "unit": "none",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "gh-traffic"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT check_day::timestamp AS time, value AS \"成功率\"\nFROM health_item WHERE grp = 'jenkins' AND name = '全部 main(7 天)' AND $__timeFilter(check_day) ORDER BY 1",
+          "refId": "A"
+        }
+      ],
+      "id": 17
+    },
+    {
+      "type": "table",
+      "title": "CI/CD 健康檢查(最近一次)",
+      "description": "",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "gh-traffic"
+      },
+      "gridPos": {
+        "h": 14,
+        "w": 24,
+        "x": 0,
+        "y": 50
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "gh-traffic"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT CASE status WHEN 'bad' THEN '🔴 異常' WHEN 'warn' THEN '🟡 注意' ELSE '🟢 正常' END AS \"狀態\",\ngrp AS \"類別\", name AS \"項目\", detail AS \"說明\"\nFROM health_item WHERE check_day = (SELECT MAX(check_day) FROM health_run)\nORDER BY CASE status WHEN 'bad' THEN 0 WHEN 'warn' THEN 1 ELSE 2 END, grp, name",
+          "refId": "A"
+        }
+      ],
+      "id": 18
     }
   ]
 }
