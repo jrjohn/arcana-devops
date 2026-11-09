@@ -3,3 +3,5 @@
 17 */6 * * * root cd /data/devops && docker compose -p gh-traffic -f docker-compose.gh-traffic.yml run --rm gh-traffic-collector >> /var/log/gh-traffic.log 2>&1
 # README images visitors see as broken (3 tries, 2 min apart); mails John. Before daily-ci-agent (09:00).
 40 8 * * * root cd /data/devops && docker compose -p gh-traffic -f docker-compose.gh-traffic.yml run --rm gh-traffic-collector badges >> /var/log/gh-traffic.log 2>&1
+# CI/CD health check; after daily-ci-agent (09:00, ~1 h) so today's report exists. Mails John on 'bad'.
+30 10 * * * root cd /data/devops && docker compose -p gh-traffic -f docker-compose.gh-traffic.yml run --rm ci-health >> /var/log/ci-health.log 2>&1

@@ -42,6 +42,28 @@ services:
       gh-traffic-db:
         condition: service_healthy
 
+  # Daily CI/CD health check (tools/ci-health): Jenkins mains + nodes, containers, Claude CLI
+  # answering, ci-flow activity, disk/swap, daily-agent report, weekly rebuild, gh-traffic jobs.
+  # Read-only mounts except the docker socket, which `docker inspect/exec/logs` need.
+  ci-health:
+    build: ./tools/ci-health
+    image: ci-health:latest
+    profiles: ["job"]
+    environment:
+      DATABASE_URL: "postgres://gh_traffic:${GH_TRAFFIC_DB_PASSWORD}@gh-traffic-db:5432/gh_traffic"
+      JENKINS_URL: http://jenkins:8080/jenkins
+      JENKINS_CRED: /run/jenkins-cred
+      HOST_DATA: /host-data
+      GMAIL_CRED: /run/gmail-smtp
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /data:/host-data:ro
+      - /etc/ci-jenkins-cred:/run/jenkins-cred:ro
+      - /data/projects/daily-ci-agent/claude-home/.gmail-smtp:/run/gmail-smtp:ro
+    depends_on:
+      gh-traffic-db:
+        condition: service_healthy
+
 networks:
   default:
     name: devops_default
