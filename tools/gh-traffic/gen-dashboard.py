@@ -51,7 +51,9 @@ panels = [
          desc="收集程式每 6 小時跑一次;這裡超過一天沒更新=收集程式壞了"),
     ts("每天瀏覽與訪客", f"""SELECT day::timestamp AS time, SUM(views) AS "瀏覽", SUM(view_uniques) AS "訪客"
 FROM repo_daily WHERE $__timeFilter(day) AND {REPO_FILTER} GROUP BY 1 ORDER BY 1""", 4),
-    ts("每週訪客趨勢", f"""SELECT date_trunc('week', day)::timestamp AS time, SUM(view_uniques) AS "訪客/週", SUM(views) AS "瀏覽/週"
+    # Plotted at the week's last day (Sunday): a point at Monday read as "the data stops on
+    # Monday" even though it sums Mon..Sun (2026-11-09).
+    ts("每週訪客趨勢(點=該週週日)", f"""SELECT (date_trunc('week', day) + interval '6 days')::timestamp AS time, SUM(view_uniques) AS "訪客/週", SUM(views) AS "瀏覽/週"
 FROM repo_daily WHERE $__timeFilter(day) AND {REPO_FILTER} GROUP BY 1 ORDER BY 1""", 12, w=12, draw="line"),
     ts("每天 Clone", f"""SELECT day::timestamp AS time, SUM(clones) AS "clone", SUM(clone_uniques) AS "不重複 clone"
 FROM repo_daily WHERE $__timeFilter(day) AND {REPO_FILTER} GROUP BY 1 ORDER BY 1""", 12, x=12, w=12),
