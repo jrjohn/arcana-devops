@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.2.0](https://github.com/jrjohn/arcana-devops/compare/v1.1.0...v1.2.0) (2026-11-09)
+
+
+### Features
+
+* **gh-traffic:** 記錄「不穩」的圖(第一次失敗、重試才好),儀表板顯示,不寄信 ([#64](https://github.com/jrjohn/arcana-devops/issues/64)) ([fa5355e](https://github.com/jrjohn/arcana-devops/commit/fa5355ed454b3efbea4437a32adffd272ca7e03f))
+
+
+### Bug Fixes
+
+* **token-alert:** 每日巡檢與其他工作分開算門檻,停掉每天早上的誤報 ([#63](https://github.com/jrjohn/arcana-devops/issues/63)) ([9772fce](https://github.com/jrjohn/arcana-devops/commit/9772fcecd1de0696f71b2464876e2c28f466f88c))
+
 ## [1.1.0](https://github.com/jrjohn/arcana-devops/compare/v1.0.0...v1.1.0) (2026-11-06)
 
 
