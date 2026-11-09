@@ -27,6 +27,8 @@ CREATE TABLE IF NOT EXISTS badge_check (
     check_day DATE NOT NULL, repo TEXT NOT NULL, src TEXT NOT NULL,
     alt TEXT NOT NULL, original TEXT NOT NULL, status TEXT NOT NULL,
     PRIMARY KEY (check_day, repo, src));
+ALTER TABLE badge_check ADD COLUMN IF NOT EXISTS persistent BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE badge_run ADD COLUMN IF NOT EXISTS flaky INT NOT NULL DEFAULT 0;
 ";
 
 /// One `<img>` as GitHub rendered it.
@@ -116,6 +118,30 @@ fn absolute(src: &str, owner: &str, repo: &str) -> String {
     url.replace(' ', "%20")
 }
 
+fn record(
+    db: &mut Client,
+    day: &str,
+    repo: &str,
+    img: &Image,
+    status: &str,
+    persistent: bool,
+) -> Res<()> {
+    db.execute(
+        "INSERT INTO badge_check (check_day, repo, src, alt, original, status, persistent)
+         VALUES ($1::text::date, $2, $3, $4, $5, $6, $7)",
+        &[
+            &day,
+            &repo,
+            &img.src,
+            &img.alt,
+            &img.original,
+            &status,
+            &persistent,
+        ],
+    )?;
+    Ok(())
+}
+
 pub fn run(
     db: &mut Client,
     gh: &Github,
@@ -155,6 +181,10 @@ pub fn run(
             failing.insert(i, why);
         }
     }
+    // Images that failed the first fetch but loaded on a retry are "flaky": a visitor sees them
+    // broken some of the time (the jrjohn followers/stars badges, 2026-11-09, passed every
+    // all-three-fail check while showing broken on the page). Recorded, never mailed.
+    let first_failures = failing.clone();
     for _ in 1..ATTEMPTS {
         if failing.is_empty() {
             break;
@@ -179,23 +209,30 @@ pub fn run(
     let mut lines = Vec::new();
     for (i, why) in &failing {
         let (repo, img) = &all[*i];
-        db.execute(
-            "INSERT INTO badge_check VALUES ($1::text::date, $2, $3, $4, $5, $6)",
-            &[&day, repo, &img.src, &img.alt, &img.original, why],
-        )?;
+        record(db, &day, repo, img, why, true)?;
         lines.push(format!(
             "  {repo}  [{}]  {why}\n      {}",
             img.alt, img.original
         ));
     }
+    let mut flaky = 0i32;
+    for (i, why) in first_failures
+        .iter()
+        .filter(|(i, _)| !failing.contains_key(i))
+    {
+        let (repo, img) = &all[*i];
+        record(db, &day, repo, img, &format!("flaky: {why}"), false)?;
+        flaky += 1;
+    }
     let (images, broken) = (i32::try_from(all.len())?, i32::try_from(failing.len())?);
     db.execute(
-        "INSERT INTO badge_run VALUES ($1::text::date, $2, $3, $4)
-         ON CONFLICT (check_day) DO UPDATE SET repos = EXCLUDED.repos, images = EXCLUDED.images, broken = EXCLUDED.broken",
-        &[&day, &repos, &images, &broken],
+        "INSERT INTO badge_run (check_day, repos, images, broken, flaky) VALUES ($1::text::date, $2, $3, $4, $5)
+         ON CONFLICT (check_day) DO UPDATE SET repos = EXCLUDED.repos, images = EXCLUDED.images,
+         broken = EXCLUDED.broken, flaky = EXCLUDED.flaky",
+        &[&day, &repos, &images, &broken, &flaky],
     )?;
     println!(
-        "badges {day}: {repos} repos, {images} images, {broken} broken after {ATTEMPTS} tries"
+        "badges {day}: {repos} repos, {images} images, {broken} broken after {ATTEMPTS} tries, {flaky} flaky"
     );
     for l in &lines {
         println!("{l}");

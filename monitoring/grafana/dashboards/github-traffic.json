@@ -589,8 +589,8 @@
     },
     {
       "type": "stat",
-      "title": "README 破圖",
-      "description": "每天 08:40 用 GitHub 實際顯示的頁面、不登入抓每張圖;連續 3 次(間隔 2 分鐘)失敗才算",
+      "title": "README 破圖 / 不穩",
+      "description": "每天 08:40 用 GitHub 實際顯示的頁面、不登入抓每張圖。破圖=連 3 次(隔 2 分)都失敗,會寄信;不穩=第一次失敗、重試才好,只記錄",
       "datasource": {
         "type": "grafana-postgresql-datasource",
         "uid": "gh-traffic"
@@ -615,7 +615,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "none",
+          "unit": "string",
           "color": {
             "mode": "fixed",
             "fixedColor": "#0891b2"
@@ -632,7 +632,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT broken FROM badge_run ORDER BY check_day DESC LIMIT 1",
+          "rawSql": "SELECT broken::text || ' / ' || flaky::text FROM badge_run ORDER BY check_day DESC LIMIT 1",
           "refId": "A"
         }
       ],
@@ -640,7 +640,7 @@
     },
     {
       "type": "table",
-      "title": "破圖清單(最近一次檢查)",
+      "title": "破圖與不穩的圖(最近一次檢查)",
       "description": "",
       "datasource": {
         "type": "grafana-postgresql-datasource",
@@ -669,7 +669,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT repo AS \"Repo\", alt AS \"圖\", status AS \"原因\", original AS \"網址\"\nFROM badge_check WHERE check_day = (SELECT MAX(check_day) FROM badge_run) ORDER BY repo",
+          "rawSql": "SELECT CASE WHEN persistent THEN '破圖' ELSE '不穩' END AS \"狀態\", repo AS \"Repo\", alt AS \"圖\", status AS \"原因\", original AS \"網址\"\nFROM badge_check WHERE check_day = (SELECT MAX(check_day) FROM badge_run) ORDER BY persistent DESC, repo",
           "refId": "A"
         }
       ],
