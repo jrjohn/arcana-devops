@@ -90,6 +90,15 @@ pub fn swap(used_percent: f64) -> Status {
     }
 }
 
+/// Today's daily-agent report is missing: still running = warn, finished without it = bad.
+pub fn daily_report_missing(still_running: bool) -> Status {
+    if still_running {
+        Status::Warn
+    } else {
+        Status::Bad
+    }
+}
+
 /// Age in days of something that should happen daily: > 1 bad.
 pub fn freshness(age_days: i32) -> Status {
     if age_days > 1 {
@@ -334,34 +343,52 @@ fn host(items: &mut Vec<Item>) {
 fn reports(items: &mut Vec<Item>, today: &str) {
     let data = env("HOST_DATA", "/host-data");
     let path = format!("{data}/ci-reports/{today}.md");
-    match std::fs::read_to_string(&path) {
-        Ok(text) => {
-            let field = |k: &str| {
-                text.lines()
-                    .find(|l| l.contains(k))
-                    .map(|l| l.split(':').nth(1).unwrap_or("").trim().to_string())
-            };
-            let red = field("Red pipelines start of day").unwrap_or_default();
-            let review = field("Needs human review").unwrap_or_default();
+    if let Ok(text) = std::fs::read_to_string(&path) {
+        let field = |k: &str| {
+            text.lines()
+                .find(|l| l.contains(k))
+                .map(|l| l.split(':').nth(1).unwrap_or("").trim().to_string())
+        };
+        let red = field("Red pipelines start of day").unwrap_or_default();
+        let review = field("Needs human review").unwrap_or_default();
+        items.push(Item::new(
+            "daily-agent",
+            "今天的巡檢報告",
+            Status::Ok,
+            None,
+            format!(
+                "開工紅燈 {}; 待人處理 {}",
+                red.chars().take(40).collect::<String>(),
+                review.chars().take(50).collect::<String>()
+            ),
+        ));
+    } else {
+        // A run that is still going is not a failure: on 2026-11-13 the agent was 1 h 37 min in at
+        // 10:30 and this check mailed John a false "bad". Only a finished run without a report is.
+        {
+            let running = sh(
+                "docker",
+                &[
+                    "exec",
+                    "daily-ci-agent",
+                    "pgrep",
+                    "-f",
+                    "^bash /usr/local/bin/daily-run.sh",
+                ],
+            )
+            .is_ok_and(|out| !out.trim().is_empty());
             items.push(Item::new(
                 "daily-agent",
                 "今天的巡檢報告",
-                Status::Ok,
+                daily_report_missing(running),
                 None,
-                format!(
-                    "開工紅燈 {}; 待人處理 {}",
-                    red.chars().take(40).collect::<String>(),
-                    review.chars().take(50).collect::<String>()
-                ),
+                if running {
+                    format!("{path} 還沒寫出來:巡檢仍在執行中")
+                } else {
+                    format!("{path} 不存在(巡檢沒跑或沒寫報告)")
+                },
             ));
         }
-        Err(_) => items.push(Item::new(
-            "daily-agent",
-            "今天的巡檢報告",
-            Status::Bad,
-            None,
-            format!("{path} 不存在(巡檢沒跑或失敗)"),
-        )),
     }
     let log = format!("{data}/projects/claude-agents-workflow/weekly-rebuild.log");
     let last = std::fs::read_to_string(&log).ok().and_then(|t| {
@@ -476,6 +503,8 @@ mod tests {
         assert_eq!(freshness(0), Status::Ok);
         assert_eq!(freshness(1), Status::Ok);
         assert_eq!(freshness(2), Status::Bad);
+        assert_eq!(daily_report_missing(true), Status::Warn);
+        assert_eq!(daily_report_missing(false), Status::Bad);
     }
 
     #[test]
