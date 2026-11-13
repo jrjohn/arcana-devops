@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.1](https://github.com/jrjohn/arcana-devops/compare/v1.3.0...v1.3.1) (2026-11-13)
+
+
+### Bug Fixes
+
+* **daily-agent:** 沒寫報告不再無聲、token 不再出現在指令參數、健康檢查不誤報「還在跑」 ([#69](https://github.com/jrjohn/arcana-devops/issues/69)) ([35db0ec](https://github.com/jrjohn/arcana-devops/commit/35db0ec5cba21e4edb95d373a3ed4d7ab7800d80))
+
 ## [1.3.0](https://github.com/jrjohn/arcana-devops/compare/v1.2.0...v1.3.0) (2026-11-09)
 
 
