@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.0](https://github.com/jrjohn/arcana-devops/compare/v1.3.1...v1.4.0) (2026-11-14)
+
+
+### Features
+
+* **ci-health:** 偵測 Jenkins 工作目錄裡的 root 檔案(下一次 checkout 會失敗) ([#71](https://github.com/jrjohn/arcana-devops/issues/71)) ([e20f79c](https://github.com/jrjohn/arcana-devops/commit/e20f79c86d7054a961d421669f6685ee99b95017))
+
 ## [1.3.1](https://github.com/jrjohn/arcana-devops/compare/v1.3.0...v1.3.1) (2026-11-13)
 
 
