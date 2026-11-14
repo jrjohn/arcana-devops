@@ -457,6 +457,51 @@ fn traffic(db: &mut Client, items: &mut Vec<Item>) {
     }
 }
 
+/// Files in Jenkins workspaces not owned by the Jenkins user: a container that ran as root wrote
+/// them, and the next checkout cannot delete them ("Failed to delete workspace", esp32 main red
+/// 5x on 2026-11-14). Warn before that happens.
+fn workspaces(items: &mut Vec<Item>) {
+    let ws = env("JENKINS_WORKSPACES", "/jenkins-workspace");
+    let uid = env("JENKINS_UID", "1000");
+    match sh("find", &[&ws, "!", "-user", &uid, "-print"]) {
+        Ok(out) => {
+            let mut per: std::collections::BTreeMap<String, usize> =
+                std::collections::BTreeMap::new();
+            for line in out.lines() {
+                let rel = line.trim_start_matches(&ws).trim_start_matches('/');
+                if let Some(top) = rel.split('/').next().filter(|s| !s.is_empty()) {
+                    *per.entry(top.to_string()).or_default() += 1;
+                }
+            }
+            let total: usize = per.values().sum();
+            let detail = if per.is_empty() {
+                "沒有".to_string()
+            } else {
+                per.iter()
+                    .map(|(k, v)| format!("{k} {v}"))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            };
+            #[allow(clippy::cast_precision_loss)]
+            let value = Some(total as f64);
+            items.push(Item::new(
+                "jenkins",
+                "工作目錄的 root 檔案",
+                if total > 0 { Status::Warn } else { Status::Ok },
+                value,
+                detail,
+            ));
+        }
+        Err(e) => items.push(Item::new(
+            "jenkins",
+            "工作目錄的 root 檔案",
+            Status::Bad,
+            None,
+            format!("無法檢查: {e}"),
+        )),
+    }
+}
+
 pub fn all(db: &mut Client) -> Vec<Item> {
     let today: String = db
         .query_one("SELECT (now() AT TIME ZONE 'Asia/Taipei')::date::text", &[])
@@ -471,6 +516,7 @@ pub fn all(db: &mut Client) -> Vec<Item> {
             format!("無法檢查: {e}"),
         ));
     }
+    workspaces(&mut items);
     containers(&mut items);
     claude(&mut items);
     ci_flow(&mut items);

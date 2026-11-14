@@ -59,6 +59,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - /data:/host-data:ro
       - /etc/ci-jenkins-cred:/run/jenkins-cred:ro
+      - /opt/arcana-state/jenkins-home/workspace:/jenkins-workspace:ro
       - /data/projects/daily-ci-agent/claude-home/.gmail-smtp:/run/gmail-smtp:ro
     depends_on:
       gh-traffic-db:
