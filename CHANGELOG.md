@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.0](https://github.com/jrjohn/arcana-devops/compare/v1.4.0...v1.5.0) (2026-11-18)
+
+
+### Features
+
+* **ci-health:** 每小時檢查 /data,&gt;=90% 寄信(3 小時內不重寄) ([#74](https://github.com/jrjohn/arcana-devops/issues/74)) ([42e0236](https://github.com/jrjohn/arcana-devops/commit/42e02360b733c591ffffda34c266f38c4be3670e))
+
 ## [1.4.0](https://github.com/jrjohn/arcana-devops/compare/v1.3.1...v1.4.0) (2026-11-14)
 
 
