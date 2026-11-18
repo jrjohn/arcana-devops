@@ -158,12 +158,41 @@ fn send_mail(subject: &str, body: &str) -> Res<()> {
     Ok(())
 }
 
+/// `ci-health --disk` (cron, hourly): mail when /data reaches 90 %, at most every 3 hours.
+fn disk_watch(db: &mut Client, dry: bool) -> Res<()> {
+    db.batch_execute("CREATE TABLE IF NOT EXISTS disk_alert (id INT PRIMARY KEY, last_sent TIMESTAMPTZ NOT NULL)")?;
+    let pct = checks::data_disk_percent()?;
+    let since: Option<i64> = db
+        .query_opt("SELECT (EXTRACT(EPOCH FROM now() - last_sent) / 60)::bigint FROM disk_alert WHERE id = 1", &[])?
+        .map(|r| r.get(0));
+    println!(
+        "disk {pct:.0}% (last disk mail {} min ago)",
+        since.map_or("never".into(), |m| m.to_string())
+    );
+    if !checks::disk_alert_due(pct, since) || dry {
+        return Ok(());
+    }
+    let body = format!(
+        "bluesea /data 已用 {pct:.0}%(門檻 90%)。滿了所有 CI 建置都會失敗。\n\n{}\n\n         常見原因:失敗建置留下的大容器/volume、同時跑多個大型建置。3 小時內不再重寄。\n",
+        checks::disk_context()
+    );
+    send_mail(&format!("[arcana-ci] bluesea 磁碟 {pct:.0}%"), &body)?;
+    db.execute(
+        "INSERT INTO disk_alert VALUES (1, now()) ON CONFLICT (id) DO UPDATE SET last_sent = now()",
+        &[],
+    )?;
+    Ok(())
+}
+
 fn main() -> Res<()> {
     let dry = std::env::args().any(|a| a == "--dry-run");
     let mut db = Client::connect(
         &std::env::var("DATABASE_URL").map_err(|_| "DATABASE_URL is not set")?,
         NoTls,
     )?;
+    if std::env::args().any(|a| a == "--disk") {
+        return disk_watch(&mut db, dry);
+    }
     let items = checks::all(&mut db);
     let text = report(&items);
     println!("{text}");

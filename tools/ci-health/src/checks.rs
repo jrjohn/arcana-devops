@@ -283,32 +283,88 @@ fn ci_flow(items: &mut Vec<Item>) {
     ));
 }
 
-fn host(items: &mut Vec<Item>) {
+/// `/data` use in percent, from `df -P` on the host mount.
+///
+/// # Errors
+///
+/// When `df` fails or its output cannot be read.
+pub fn data_disk_percent() -> Res<f64> {
     let data = env("HOST_DATA", "/host-data");
-    match sh("df", &["-P", &data]) {
-        Ok(out) => {
-            let pct = out
-                .lines()
-                .nth(1)
-                .and_then(|l| l.split_whitespace().nth(4))
-                .and_then(|p| p.trim_end_matches('%').parse::<f64>().ok());
-            match pct {
-                Some(p) => items.push(Item::new(
-                    "host",
-                    "/data 磁碟",
-                    disk(p),
-                    Some(p),
-                    format!("{p:.0}%"),
-                )),
-                None => items.push(Item::new(
-                    "host",
-                    "/data 磁碟",
-                    Status::Bad,
-                    None,
-                    "無法檢查: df 輸出看不懂",
-                )),
-            }
-        }
+    let out = sh("df", &["-P", &data])?;
+    out.lines()
+        .nth(1)
+        .and_then(|l| l.split_whitespace().nth(4))
+        .and_then(|p| p.trim_end_matches('%').parse::<f64>().ok())
+        .ok_or_else(|| "df 輸出看不懂".into())
+}
+
+/// What is using the disk, for the alert mail: docker's own summary and the largest containers.
+pub fn disk_context() -> String {
+    let df =
+        sh("docker", &["system", "df"]).unwrap_or_else(|e| format!("docker system df 失敗: {e}"));
+    let containers = sh(
+        "docker",
+        &[
+            "ps",
+            "-a",
+            "-s",
+            "--format",
+            "{{.Size}}\t{{.Names}}\t{{.Status}}",
+        ],
+    )
+    .map(|o| {
+        let mut lines: Vec<&str> = o.lines().collect();
+        lines.sort_by_key(|l| std::cmp::Reverse(size_bytes(l.split('\t').next().unwrap_or(""))));
+        lines.into_iter().take(8).collect::<Vec<_>>().join("\n")
+    })
+    .unwrap_or_default();
+    format!("{df}\n最大的容器(含停止的):\n{containers}")
+}
+
+/// "12.3GB (virtual 16.9GB)" -> bytes of the first number, for sorting only.
+fn size_bytes(s: &str) -> u64 {
+    let first = s.split_whitespace().next().unwrap_or("");
+    let num: String = first
+        .chars()
+        .take_while(|c| c.is_ascii_digit() || *c == '.')
+        .collect();
+    let unit = &first[num.len()..];
+    let mult: f64 = match unit.trim_start_matches('k').trim_start_matches('K') {
+        _ if unit.starts_with("GB") => 1e9,
+        _ if unit.starts_with("MB") => 1e6,
+        _ if unit.starts_with("kB") || unit.starts_with("KB") => 1e3,
+        _ => 1.0,
+    };
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    let bytes = (num.parse::<f64>().unwrap_or(0.0) * mult) as u64;
+    bytes
+}
+
+/// Mail when `/data` is at or above 90 % and no disk mail went out in the last 3 hours.
+/// 2026-11-17 it went 69 % -> 100 % within hours (failed coverage containers kept 20 GB
+/// volumes) and the once-a-day check could not see it.
+pub fn disk_alert_due(percent: f64, minutes_since_last_mail: Option<i64>) -> bool {
+    percent >= 90.0 && minutes_since_last_mail.is_none_or(|m| m >= 180)
+}
+
+fn host(items: &mut Vec<Item>) {
+    match data_disk_percent().map(Some) {
+        Ok(pct) => match pct {
+            Some(p) => items.push(Item::new(
+                "host",
+                "/data 磁碟",
+                disk(p),
+                Some(p),
+                format!("{p:.0}%"),
+            )),
+            None => items.push(Item::new(
+                "host",
+                "/data 磁碟",
+                Status::Bad,
+                None,
+                "無法檢查: df 輸出看不懂",
+            )),
+        },
         Err(e) => items.push(Item::new(
             "host",
             "/data 磁碟",
@@ -549,6 +605,12 @@ mod tests {
         assert_eq!(freshness(0), Status::Ok);
         assert_eq!(freshness(1), Status::Ok);
         assert_eq!(freshness(2), Status::Bad);
+        assert!(disk_alert_due(90.0, None));
+        assert!(disk_alert_due(97.0, Some(181)));
+        assert!(!disk_alert_due(97.0, Some(60))); // cooling down
+        assert!(!disk_alert_due(89.9, None));
+        assert_eq!(size_bytes("12.3GB (virtual 16.9GB)"), 12_300_000_000);
+        assert_eq!(size_bytes("651kB (virtual 72.1MB)"), 651_000);
         assert_eq!(daily_report_missing(true), Status::Warn);
         assert_eq!(daily_report_missing(false), Status::Bad);
     }
