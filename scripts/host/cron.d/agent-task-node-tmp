@@ -1,0 +1,5 @@
+# agent-task-node: the AI fix agent clones repos into /tmp/myrepos (and scratch dirs as
+# /root/.claude/tmp-*) and never deletes them; one desktop-km clone with build output was 2 GB.
+# Daily, remove top-level entries untouched for > 1 day; running tasks touch theirs, so they stay.
+# 2026-11-19 (container writable layer had grown to 3.7 GB in 4 days).
+20 4 * * * root docker exec agent-task-node sh -c 'find /tmp/myrepos -mindepth 1 -maxdepth 1 -mmin +1440 -exec rm -rf {} + 2>/dev/null; find /root/.claude -mindepth 1 -maxdepth 1 -name "tmp-*" -mmin +1440 -exec rm -rf {} + 2>/dev/null; true' >> /var/log/agent-task-node-tmp.log 2>&1
