@@ -16,7 +16,10 @@ services:
       - ${PROJECTS_DIR}:${PROJECTS_DIR}
       - ./jenkins/secrets:/run/secrets/jenkins:ro
     environment:
-      JAVA_OPTS: "-Xmx1g -Xms512m -Duser.timezone=${TZ:-Asia/Taipei} -Djenkins.install.runSetupWizard=false"
+      # websocket idle 60s->600s, ping 30s->15s: the Windows agent (office Wi-Fi, over the internet)
+      # was cut by Jetty's 60 s idle timeout whenever a ping arrived late during a build, then
+      # restart-looped ~150x/day (2026-11-21).
+      JAVA_OPTS: "-Xmx1g -Xms512m -Duser.timezone=${TZ:-Asia/Taipei} -Djenkins.install.runSetupWizard=false -Djenkins.websocket.idleTimeout=600 -Djenkins.websocket.pingInterval=15"
       DOCKER_HOST: "unix:///var/run/docker.sock"
       CASC_JENKINS_CONFIG: "/var/jenkins_home/casc.yml"
       SECRETS: "/run/secrets/jenkins"
