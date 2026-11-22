@@ -40,6 +40,12 @@ Each multibranch build creates a `<registry>/arcana/<app>:build-<N>` image. With
 
 ## Hard constraints (NEVER violate)
 
+- **Paused repos — not a finding, do not report:** `arcana-desktop-km` has **no Jenkins job on purpose**
+  (John, 2026-11-19: develop locally first; job, images and seed XML removed, devops #79). A 404 for
+  `desktop-km-app-pipeline-mb` and its open PRs without CI are expected. Do not list it under
+  "Needs human review", do not recreate the job, do not touch its PRs. Mention it at most once in
+  "Collateral notes" as "paused by owner". This ends when the seed XML is back in `jobs/`.
+
 - **Never** `git push --force` / `-f` / `--force-with-lease`.
 - **Never** delete branches.
 - **Never** commit secrets, `.env`, tokens, keys.
