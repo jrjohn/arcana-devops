@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.2](https://github.com/jrjohn/arcana-devops/compare/v1.5.1...v1.5.2) (2026-11-22)
+
+
+### Bug Fixes
+
+* **dashboard:** 每週訪客趨勢的點畫在該週週日,不是週一 ([#68](https://github.com/jrjohn/arcana-devops/issues/68)) ([9c5850e](https://github.com/jrjohn/arcana-devops/commit/9c5850e76682470c7647cf15107a6ad2610f4a55))
+
 ## [1.5.1](https://github.com/jrjohn/arcana-devops/compare/v1.5.0...v1.5.1) (2026-11-22)
 
 
