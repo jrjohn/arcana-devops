@@ -405,7 +405,7 @@
     },
     {
       "type": "timeseries",
-      "title": "每週訪客趨勢",
+      "title": "每週訪客趨勢(點=該週週日)",
       "description": "",
       "datasource": {
         "type": "grafana-postgresql-datasource",
@@ -452,7 +452,7 @@
           "editorMode": "code",
           "format": "time_series",
           "rawQuery": true,
-          "rawSql": "SELECT date_trunc('week', day)::timestamp AS time, SUM(view_uniques) AS \"訪客/週\", SUM(views) AS \"瀏覽/週\"\nFROM repo_daily WHERE $__timeFilter(day) AND repo IN (${repo:sqlstring}) GROUP BY 1 ORDER BY 1",
+          "rawSql": "SELECT (date_trunc('week', day) + interval '6 days')::timestamp AS time, SUM(view_uniques) AS \"訪客/週\", SUM(views) AS \"瀏覽/週\"\nFROM repo_daily WHERE $__timeFilter(day) AND repo IN (${repo:sqlstring}) GROUP BY 1 ORDER BY 1",
           "refId": "A"
         }
       ],
