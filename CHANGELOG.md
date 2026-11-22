@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.1](https://github.com/jrjohn/arcana-devops/compare/v1.5.0...v1.5.1) (2026-11-22)
+
+
+### Bug Fixes
+
+* **jenkins:** websocket 閒置逾時 60→600 秒、ping 30→15 秒 ([#82](https://github.com/jrjohn/arcana-devops/issues/82)) ([6b60b64](https://github.com/jrjohn/arcana-devops/commit/6b60b645f879bc01a988a74f737318d265460b30))
+
 ## [1.5.0](https://github.com/jrjohn/arcana-devops/compare/v1.4.0...v1.5.0) (2026-11-18)
 
 
