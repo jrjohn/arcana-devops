@@ -288,9 +288,33 @@ fn ci_flow(items: &mut Vec<Item>) {
 /// # Errors
 ///
 /// When `df` fails or its output cannot be read.
+/// True when `path` is itself a mount point: it sits on a different device than its parent.
+/// (Comparing `df`'s "Mounted on" name fails when one filesystem is bind-mounted twice.)
+/// After the /data2 disk is removed, /host-root/data2 is a plain directory on the root
+/// filesystem — same device as its parent — so it is reported as not mounted.
+pub fn is_own_mount(path: &str) -> bool {
+    use std::os::unix::fs::MetadataExt;
+    let p = std::path::Path::new(path);
+    let Some(parent) = p.parent() else {
+        return true;
+    };
+    match (std::fs::metadata(p), std::fs::metadata(parent)) {
+        (Ok(a), Ok(b)) => a.dev() != b.dev(),
+        _ => false,
+    }
+}
+
 pub fn data_disk_percent() -> Res<f64> {
-    let data = env("HOST_DATA", "/host-data");
-    let out = sh("df", &["-P", &data])?;
+    disk_percent(&env("HOST_DATA", "/host-data"))
+}
+
+/// Use in percent of the filesystem holding `path` (`df -P`).
+///
+/// # Errors
+///
+/// When `df` fails or its output cannot be read.
+pub fn disk_percent(path: &str) -> Res<f64> {
+    let out = sh("df", &["-P", path])?;
     out.lines()
         .nth(1)
         .and_then(|l| l.split_whitespace().nth(4))
@@ -343,6 +367,20 @@ fn size_bytes(s: &str) -> u64 {
 /// Mail when `/data` is at or above 90 % and no disk mail went out in the last 3 hours.
 /// 2026-11-17 it went 69 % -> 100 % within hours (failed coverage containers kept 20 GB
 /// volumes) and the once-a-day check could not see it.
+/// Disks the hourly watch covers: `DISK_WATCH="/data=/host-data,/=/host-root,/data2=/host-data2"`
+/// (host mount point = path inside this container). Default: just /data.
+pub fn watched_disks() -> Vec<(String, String)> {
+    parse_disk_watch(&env("DISK_WATCH", "/data=/host-data"))
+}
+
+fn parse_disk_watch(s: &str) -> Vec<(String, String)> {
+    s.split(',')
+        .filter_map(|p| p.split_once('='))
+        .map(|(host, inner)| (host.trim().to_string(), inner.trim().to_string()))
+        .filter(|(h, i)| !h.is_empty() && !i.is_empty())
+        .collect()
+}
+
 pub fn disk_alert_due(percent: f64, minutes_since_last_mail: Option<i64>) -> bool {
     percent >= 90.0 && minutes_since_last_mail.is_none_or(|m| m >= 180)
 }
@@ -606,6 +644,15 @@ mod tests {
         assert_eq!(freshness(1), Status::Ok);
         assert_eq!(freshness(2), Status::Bad);
         assert!(disk_alert_due(90.0, None));
+        assert!(!is_own_mount("/definitely/not/here"));
+        assert_eq!(
+            parse_disk_watch("/data=/host-data, /=/host-root,bad,/data2=/host-data2"),
+            vec![
+                ("/data".to_string(), "/host-data".to_string()),
+                ("/".to_string(), "/host-root".to_string()),
+                ("/data2".to_string(), "/host-data2".to_string()),
+            ]
+        );
         assert!(disk_alert_due(97.0, Some(181)));
         assert!(!disk_alert_due(97.0, Some(60))); // cooling down
         assert!(!disk_alert_due(89.9, None));

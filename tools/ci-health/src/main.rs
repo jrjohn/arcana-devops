@@ -158,29 +158,56 @@ fn send_mail(subject: &str, body: &str) -> Res<()> {
     Ok(())
 }
 
-/// `ci-health --disk` (cron, hourly): mail when /data reaches 90 %, at most every 3 hours.
+/// `ci-health --disk` (cron, hourly): for each watched disk, mail when it reaches 90 %,
+/// at most every 3 hours per disk. A disk whose mount is gone (e.g. the /data2 trial disk
+/// after it is deleted) is skipped, not reported as an error.
 fn disk_watch(db: &mut Client, dry: bool) -> Res<()> {
-    db.batch_execute("CREATE TABLE IF NOT EXISTS disk_alert (id INT PRIMARY KEY, last_sent TIMESTAMPTZ NOT NULL)")?;
-    let pct = checks::data_disk_percent()?;
-    let since: Option<i64> = db
-        .query_opt("SELECT (EXTRACT(EPOCH FROM now() - last_sent) / 60)::bigint FROM disk_alert WHERE id = 1", &[])?
-        .map(|r| r.get(0));
-    println!(
-        "disk {pct:.0}% (last disk mail {} min ago)",
-        since.map_or("never".into(), |m| m.to_string())
-    );
-    if !checks::disk_alert_due(pct, since) || dry {
-        return Ok(());
-    }
-    let body = format!(
-        "bluesea /data 已用 {pct:.0}%(門檻 90%)。滿了所有 CI 建置都會失敗。\n\n{}\n\n         常見原因:失敗建置留下的大容器/volume、同時跑多個大型建置。3 小時內不再重寄。\n",
-        checks::disk_context()
-    );
-    send_mail(&format!("[arcana-ci] bluesea 磁碟 {pct:.0}%"), &body)?;
-    db.execute(
-        "INSERT INTO disk_alert VALUES (1, now()) ON CONFLICT (id) DO UPDATE SET last_sent = now()",
-        &[],
+    db.batch_execute(
+        "CREATE TABLE IF NOT EXISTS disk_alert_mount (mount TEXT PRIMARY KEY, last_sent TIMESTAMPTZ NOT NULL)",
     )?;
+    for (host, inner) in checks::watched_disks() {
+        if !std::path::Path::new(&inner).exists() {
+            println!("disk {host}: not mounted here ({inner}), skipped");
+            continue;
+        }
+        // e.g. /data2 after its disk was deleted: the path is then a plain directory on /,
+        // and df would report the root disk under the /data2 label.
+        if !checks::is_own_mount(&inner) {
+            println!("disk {host}: {inner} is not its own mount, skipped");
+            continue;
+        }
+        let pct = match checks::disk_percent(&inner) {
+            Ok(p) => p,
+            Err(e) => {
+                println!("disk {host}: cannot read ({e}), skipped");
+                continue;
+            }
+        };
+        let since: Option<i64> = db
+            .query_opt(
+                "SELECT (EXTRACT(EPOCH FROM now() - last_sent) / 60)::bigint FROM disk_alert_mount WHERE mount = $1",
+                &[&host],
+            )?
+            .map(|r| r.get(0));
+        println!(
+            "disk {host} {pct:.0}% (last mail {} min ago)",
+            since.map_or("never".into(), |m| m.to_string())
+        );
+        if !checks::disk_alert_due(pct, since) || dry {
+            continue;
+        }
+        let body = format!(
+            "bluesea {host} 已用 {pct:.0}%(門檻 90%)。滿了 CI 建置或服務會失敗。\n\n{}\n\n\
+             常見原因:失敗建置留下的大容器/volume、同時跑多個大型建置、Jenkins 工作資料夾成長。\
+             同一顆磁碟 3 小時內不再重寄。\n",
+            checks::disk_context()
+        );
+        send_mail(&format!("[arcana-ci] bluesea 磁碟 {host} {pct:.0}%"), &body)?;
+        db.execute(
+            "INSERT INTO disk_alert_mount VALUES ($1, now()) ON CONFLICT (mount) DO UPDATE SET last_sent = now()",
+            &[&host],
+        )?;
+    }
     Ok(())
 }
 
