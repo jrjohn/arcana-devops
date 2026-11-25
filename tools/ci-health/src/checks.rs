@@ -288,36 +288,20 @@ fn ci_flow(items: &mut Vec<Item>) {
 /// # Errors
 ///
 /// When `df` fails or its output cannot be read.
-/// The mount point `df` reports for `path` — differs from `path` when `path` is just a
-/// directory on some other filesystem (e.g. /data2 after its disk was removed).
-///
-/// # Errors
-///
-/// When `df` fails or its output cannot be read.
-pub fn mount_point_of(path: &str) -> Res<String> {
-    let out = sh("df", &["-P", path])?;
-    out.lines()
-        .nth(1)
-        .and_then(|l| l.split_whitespace().nth(5))
-        .map(str::to_string)
-        .ok_or_else(|| "df 輸出看不懂".into())
-}
-
-/// True when `path` is itself a mount point (not a directory on another filesystem).
+/// True when `path` is itself a mount point: it sits on a different device than its parent.
+/// (Comparing `df`'s "Mounted on" name fails when one filesystem is bind-mounted twice.)
+/// After the /data2 disk is removed, /host-root/data2 is a plain directory on the root
+/// filesystem — same device as its parent — so it is reported as not mounted.
 pub fn is_own_mount(path: &str) -> bool {
-    mount_point_of(path).is_ok_and(|mp| same_path(&mp, path))
-}
-
-fn same_path(a: &str, b: &str) -> bool {
-    let norm = |p: &str| {
-        let t = p.trim_end_matches('/');
-        if t.is_empty() {
-            "/".to_string()
-        } else {
-            t.to_string()
-        }
+    use std::os::unix::fs::MetadataExt;
+    let p = std::path::Path::new(path);
+    let Some(parent) = p.parent() else {
+        return true;
     };
-    norm(a) == norm(b)
+    match (std::fs::metadata(p), std::fs::metadata(parent)) {
+        (Ok(a), Ok(b)) => a.dev() != b.dev(),
+        _ => false,
+    }
 }
 
 pub fn data_disk_percent() -> Res<f64> {
@@ -660,9 +644,7 @@ mod tests {
         assert_eq!(freshness(1), Status::Ok);
         assert_eq!(freshness(2), Status::Bad);
         assert!(disk_alert_due(90.0, None));
-        assert!(same_path("/host-root/data2", "/host-root/data2/"));
-        assert!(same_path("/", "/"));
-        assert!(!same_path("/host-root", "/host-root/data2"));
+        assert!(!is_own_mount("/definitely/not/here"));
         assert_eq!(
             parse_disk_watch("/data=/host-data, /=/host-root,bad,/data2=/host-data2"),
             vec![
