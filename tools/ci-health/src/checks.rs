@@ -288,9 +288,49 @@ fn ci_flow(items: &mut Vec<Item>) {
 /// # Errors
 ///
 /// When `df` fails or its output cannot be read.
+/// The mount point `df` reports for `path` — differs from `path` when `path` is just a
+/// directory on some other filesystem (e.g. /data2 after its disk was removed).
+///
+/// # Errors
+///
+/// When `df` fails or its output cannot be read.
+pub fn mount_point_of(path: &str) -> Res<String> {
+    let out = sh("df", &["-P", path])?;
+    out.lines()
+        .nth(1)
+        .and_then(|l| l.split_whitespace().nth(5))
+        .map(str::to_string)
+        .ok_or_else(|| "df 輸出看不懂".into())
+}
+
+/// True when `path` is itself a mount point (not a directory on another filesystem).
+pub fn is_own_mount(path: &str) -> bool {
+    mount_point_of(path).is_ok_and(|mp| same_path(&mp, path))
+}
+
+fn same_path(a: &str, b: &str) -> bool {
+    let norm = |p: &str| {
+        let t = p.trim_end_matches('/');
+        if t.is_empty() {
+            "/".to_string()
+        } else {
+            t.to_string()
+        }
+    };
+    norm(a) == norm(b)
+}
+
 pub fn data_disk_percent() -> Res<f64> {
-    let data = env("HOST_DATA", "/host-data");
-    let out = sh("df", &["-P", &data])?;
+    disk_percent(&env("HOST_DATA", "/host-data"))
+}
+
+/// Use in percent of the filesystem holding `path` (`df -P`).
+///
+/// # Errors
+///
+/// When `df` fails or its output cannot be read.
+pub fn disk_percent(path: &str) -> Res<f64> {
+    let out = sh("df", &["-P", path])?;
     out.lines()
         .nth(1)
         .and_then(|l| l.split_whitespace().nth(4))
@@ -343,6 +383,20 @@ fn size_bytes(s: &str) -> u64 {
 /// Mail when `/data` is at or above 90 % and no disk mail went out in the last 3 hours.
 /// 2026-11-17 it went 69 % -> 100 % within hours (failed coverage containers kept 20 GB
 /// volumes) and the once-a-day check could not see it.
+/// Disks the hourly watch covers: `DISK_WATCH="/data=/host-data,/=/host-root,/data2=/host-data2"`
+/// (host mount point = path inside this container). Default: just /data.
+pub fn watched_disks() -> Vec<(String, String)> {
+    parse_disk_watch(&env("DISK_WATCH", "/data=/host-data"))
+}
+
+fn parse_disk_watch(s: &str) -> Vec<(String, String)> {
+    s.split(',')
+        .filter_map(|p| p.split_once('='))
+        .map(|(host, inner)| (host.trim().to_string(), inner.trim().to_string()))
+        .filter(|(h, i)| !h.is_empty() && !i.is_empty())
+        .collect()
+}
+
 pub fn disk_alert_due(percent: f64, minutes_since_last_mail: Option<i64>) -> bool {
     percent >= 90.0 && minutes_since_last_mail.is_none_or(|m| m >= 180)
 }
@@ -606,6 +660,17 @@ mod tests {
         assert_eq!(freshness(1), Status::Ok);
         assert_eq!(freshness(2), Status::Bad);
         assert!(disk_alert_due(90.0, None));
+        assert!(same_path("/host-root/data2", "/host-root/data2/"));
+        assert!(same_path("/", "/"));
+        assert!(!same_path("/host-root", "/host-root/data2"));
+        assert_eq!(
+            parse_disk_watch("/data=/host-data, /=/host-root,bad,/data2=/host-data2"),
+            vec![
+                ("/data".to_string(), "/host-data".to_string()),
+                ("/".to_string(), "/host-root".to_string()),
+                ("/data2".to_string(), "/host-data2".to_string()),
+            ]
+        );
         assert!(disk_alert_due(97.0, Some(181)));
         assert!(!disk_alert_due(97.0, Some(60))); // cooling down
         assert!(!disk_alert_due(89.9, None));

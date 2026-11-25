@@ -54,10 +54,14 @@ services:
       JENKINS_URL: http://jenkins:8080/jenkins
       JENKINS_CRED: /run/jenkins-cred
       HOST_DATA: /host-data
+      # hourly `--disk` watch: host mount = path in here. /data2 is read through /host-root
+      # (rslave) so a missing /data2 disk never stops this container from starting.
+      DISK_WATCH: "/data=/host-data,/=/host-root,/data2=/host-root/data2"
       GMAIL_CRED: /run/gmail-smtp
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /data:/host-data:ro
+      - /:/host-root:ro,rslave
       - /etc/ci-jenkins-cred:/run/jenkins-cred:ro
       - /opt/arcana-state/jenkins-home/workspace:/jenkins-workspace:ro
       - /data/projects/daily-ci-agent/claude-home/.gmail-smtp:/run/gmail-smtp:ro
