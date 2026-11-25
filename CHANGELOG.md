@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.0](https://github.com/jrjohn/arcana-devops/compare/v1.5.2...v1.6.0) (2026-11-25)
+
+
+### Features
+
+* **ci-health:** 每小時磁碟檢查加上系統碟與 /data2 ([#87](https://github.com/jrjohn/arcana-devops/issues/87)) ([39d60af](https://github.com/jrjohn/arcana-devops/commit/39d60afddc712ccbb5effe1102fa70ea3337d16a))
+
 ## [1.5.2](https://github.com/jrjohn/arcana-devops/compare/v1.5.1...v1.5.2) (2026-11-22)
 
 
