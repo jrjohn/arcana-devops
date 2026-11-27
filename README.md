@@ -1,15 +1,15 @@
 # Jenkins DevOps Starter Kit
 
-[![Architecture Rating](https://img.shields.io/badge/Architecture%20Rating-⭐⭐⭐⭐%209.2%2F10-blue.svg)](#architecture-evaluation)
-![Jenkins](https://img.shields.io/badge/Jenkins-LTS-red?style=flat-square&logo=jenkins)
-![Docker](https://img.shields.io/badge/Docker-Compose%20v2-blue?style=flat-square&logo=docker)
-![Pipelines](https://img.shields.io/badge/Pipelines-14%20multibranch-success?style=flat-square)
-![SonarQube](https://img.shields.io/badge/SonarQube-26.2.0%20(14%20projects%20%7C%20118K%20LOC)-informational?style=flat-square&logo=sonarqube)
-![Nexus](https://img.shields.io/badge/Nexus-3.90.1%20(19%2B%20repos)-blueviolet?style=flat-square&logo=sonatype)
-![Platforms](https://img.shields.io/badge/Platforms-5%20(Web%20%7C%20Embedded%20%7C%20Mobile%20%7C%20Desktop%20%7C%20Cloud)-blueviolet?style=flat-square)
-![Monitoring](https://img.shields.io/badge/Monitoring-Prometheus%20%2B%20Grafana%20%2B%20Loki-orange?style=flat-square)
-![Dashboards](https://img.shields.io/badge/Dashboards-5%20pre--loaded-brightgreen?style=flat-square)
-![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)
+[![Architecture Rating](.github/badges/architecture-rating-9-2-10-blue-svg-034bc3f2.svg)](#architecture-evaluation)
+![Jenkins](.github/badges/jenkins-lts-red-0dd89533.svg)
+![Docker](.github/badges/docker-compose-v2-blue-bc1b8e43.svg)
+![Pipelines](.github/badges/pipelines-14-multibranch-success-82b32fec.svg)
+![SonarQube](.github/badges/sonarqube-26-2-0-14-projects-118k-loc-4d514f7c.svg)-informational?style=flat-square&logo=sonarqube)
+![Nexus](.github/badges/nexus-3-90-1-19-repos-7fcd351d.svg)-blueviolet?style=flat-square&logo=sonatype)
+![Platforms](.github/badges/platforms-5-web-embedded-mobile-desktop--e76bc687.svg)-blueviolet?style=flat-square)
+![Monitoring](.github/badges/monitoring-prometheus-grafana-loki-orang-bc8fbd71.svg)
+![Dashboards](.github/badges/dashboards-5-pre-loaded-brightgreen-3e768d43.svg)
+![License](.github/badges/license-mit-green-14dede9c.svg)
 
 Production-tested Jenkins CI/CD environment with 14 multibranch pipelines, SonarQube 26.2.0 code analysis, Nexus Repository Manager 3.90.1 (19+ proxy repos for artifact caching), Docker Registry, and a full monitoring stack (Prometheus + Grafana + Loki). One command to deploy.
 
